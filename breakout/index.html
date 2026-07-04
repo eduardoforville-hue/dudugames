@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16213e">
+<title>🧱 Breakout Dudu · DuduGames</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .stage {
+    position: relative;
+    width: min(560px, calc(100vw - 24px));
+    margin: 0 auto;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,.28), 0 0 0 1px var(--border);
+    touch-action: none;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #0d1526;
+    touch-action: none;
+  }
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+    background: var(--overlay-bg);
+    color: var(--text);
+    text-align: center;
+    transition: opacity .2s, visibility .2s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  #ov-title {
+    font-size: 28px;
+    font-weight: 800;
+  }
+  #ov-msg {
+    max-width: 330px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  #overlay .btn {
+    min-height: 44px;
+    min-width: 132px;
+    padding: 10px 14px;
+  }
+  .breakout-touch {
+    width: min(560px, 100%);
+  }
+  .breakout-touch .btn {
+    min-width: 76px;
+    font-size: 18px;
+    font-weight: 800;
+  }
+  @media (max-width: 640px) {
+    body {
+      padding: 12px;
+      align-items: flex-start;
+    }
+    .stage {
+      width: min(100%, 560px);
+    }
+    .game-hud {
+      font-size: 13px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="game-wrap wide">
+  <a class="back" href="../">← DuduGames</a>
+  <h1 class="game-title">🧱 Breakout Dudu</h1>
+  <div class="by">by DuduGames</div>
+  <div class="game-hud">
+    <span>Pontos: <b id="score">0</b></span>
+    <span>Vidas: <b id="lives">3</b></span>
+    <span>Fase: <b id="level">1</b></span>
+    <span>Recorde: <b id="best">0</b></span>
+  </div>
+  <div class="stage">
+    <canvas id="game" width="560" height="520"></canvas>
+    <div id="overlay">
+      <div id="ov-title">🧱 Breakout Dudu</div>
+      <div id="ov-msg">Mova a raquete, quebre todos os blocos e não deixe a bola cair.</div>
+      <button class="btn" id="start">▶ Jogar</button>
+    </div>
+  </div>
+  <div class="game-actions breakout-touch" aria-label="Controles do Breakout">
+    <button class="btn" id="left">←</button>
+    <button class="btn" id="launch">▶</button>
+    <button class="btn" id="right">→</button>
+  </div>
+  <p class="game-message" id="msg">Arraste na tela ou use ← →. Toque para lançar a bola.</p>
+</div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const dg = window.DuduGames;
+  const cv = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const livesEl = document.getElementById('lives');
+  const levelEl = document.getElementById('level');
+  const bestEl = document.getElementById('best');
+  const msg = document.getElementById('msg');
+  const overlay = document.getElementById('overlay');
+  const ovTitle = document.getElementById('ov-title');
+  const ovMsg = document.getElementById('ov-msg');
+  const startBtn = document.getElementById('start');
+  const launchBtn = document.getElementById('launch');
+  const leftBtn = document.getElementById('left');
+  const rightBtn = document.getElementById('right');
+
+  const W = cv.width, H = cv.height;
+  const levels = {
+    easy: { speed: 4.8, paddle: 108, rows: 4, lives: 4 },
+    normal: { speed: 5.5, paddle: 94, rows: 5, lives: 3 },
+    hard: { speed: 6.2, paddle: 78, rows: 6, lives: 3 }
+  };
+  const colors = ['#4ade80', '#22d3ee', '#a78bfa', '#fbbf24', '#fb7185', '#60a5fa'];
+  const brick = { w: 62, h: 22, gap: 8, x0: 36, y0: 70, cols: 7 };
+
+  let config = levels[dg.getDifficulty()] || levels.normal;
+  let best = dg.getRecord('breakout');
+  let state = 'menu';
+  let score = 0, lives = config.lives, phase = 1, bricks = [];
+  let paddle, ball, keys = {}, recordThisRun = false, last = 0;
+  bestEl.textContent = best;
+
+  dg.installControls({ difficulty: true, onDifficultyChange: value => {
+    config = levels[value] || levels.normal;
+    if (state !== 'run') newGame('menu');
+  } });
+
+  function showOverlay(title, text, buttonText) {
+    ovTitle.textContent = title;
+    ovMsg.textContent = text;
+    startBtn.textContent = buttonText;
+    startBtn.disabled = false;
+    overlay.classList.remove('hidden');
+  }
+
+  function hideOverlay() {
+    startBtn.disabled = true;
+    overlay.classList.add('hidden');
+  }
+
+  function updateHud() {
+    scoreEl.textContent = score;
+    livesEl.textContent = lives;
+    levelEl.textContent = phase;
+    bestEl.textContent = best;
+  }
+
+  function buildBricks() {
+    bricks = [];
+    for (let row = 0; row < config.rows; row++) {
+      for (let col = 0; col < brick.cols; col++) {
+        bricks.push({
+          x: brick.x0 + col * (brick.w + brick.gap),
+          y: brick.y0 + row * (brick.h + brick.gap),
+          w: brick.w,
+          h: brick.h,
+          alive: true,
+          hp: row < 2 || phase < 3 ? 1 : 2,
+          color: colors[row % colors.length]
+        });
+      }
+    }
+  }
+
+  function resetBall() {
+    paddle = { x: W / 2 - config.paddle / 2, y: H - 54, w: config.paddle, h: 14 };
+    ball = { x: W / 2, y: paddle.y - 12, r: 8, vx: 0, vy: 0, stuck: true };
+  }
+
+  function newGame(nextState = 'menu') {
+    score = 0;
+    phase = 1;
+    lives = config.lives;
+    recordThisRun = false;
+    state = nextState;
+    buildBricks();
+    resetBall();
+    updateHud();
+    msg.textContent = 'Arraste na tela ou use ← →. Toque para lançar a bola.';
+    if (state === 'menu') showOverlay('🧱 Breakout Dudu', 'Mova a raquete, quebre todos os blocos e não deixe a bola cair.', '▶ Jogar');
+  }
+
+  function start() {
+    newGame('run');
+    hideOverlay();
+    dg.markPlayed('breakout');
+    launch();
+  }
+
+  function launch() {
+    if (state === 'menu' || state === 'over') return start();
+    if (state !== 'run' || !ball.stuck) return;
+    const speed = config.speed + (phase - 1) * .35;
+    ball.stuck = false;
+    ball.vx = speed * (Math.random() > .5 ? .55 : -.55);
+    ball.vy = -speed;
+    dg.sound('tick');
+  }
+
+  function clampPaddle() {
+    paddle.x = Math.max(10, Math.min(W - paddle.w - 10, paddle.x));
+    if (ball.stuck) {
+      ball.x = paddle.x + paddle.w / 2;
+      ball.y = paddle.y - 12;
+    }
+  }
+
+  function setPaddleByClientX(clientX) {
+    const rect = cv.getBoundingClientRect();
+    const x = (clientX - rect.left) * W / rect.width;
+    paddle.x = x - paddle.w / 2;
+    clampPaddle();
+  }
+
+  function addScore(points) {
+    score += points;
+    if (dg.setRecord('breakout', score)) {
+      recordThisRun = true;
+      best = score;
+    }
+    if (score >= 50) dg.unlock('breakout-50');
+    updateHud();
+  }
+
+  function loseLife() {
+    lives--;
+    updateHud();
+    dg.sound('fail');
+    if (lives <= 0) return gameOver();
+    msg.textContent = 'Bola perdida. Toque para lançar de novo.';
+    resetBall();
+  }
+
+  function nextPhase() {
+    phase++;
+    dg.sound('win');
+    dg.unlock('breakout-clear');
+    msg.textContent = 'Fase limpa! A bola ficou mais rápida.';
+    buildBricks();
+    resetBall();
+    updateHud();
+  }
+
+  function gameOver() {
+    state = 'over';
+    const text = recordThisRun ? 'Novo recorde!' : 'Recorde: ' + best + '.';
+    msg.textContent = 'Fim de jogo. ' + text;
+    showOverlay('Fim de jogo', 'Você fez ' + score + ' pontos. ' + text, '↻ Tentar de novo');
+  }
+
+  function collideBrick(b) {
+    const cx = Math.max(b.x, Math.min(ball.x, b.x + b.w));
+    const cy = Math.max(b.y, Math.min(ball.y, b.y + b.h));
+    return Math.hypot(ball.x - cx, ball.y - cy) < ball.r;
+  }
+
+  function update() {
+    if (state !== 'run') return;
+    if (keys.left) paddle.x -= 7;
+    if (keys.right) paddle.x += 7;
+    clampPaddle();
+    if (ball.stuck) return;
+
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+
+    if (ball.x < ball.r || ball.x > W - ball.r) {
+      ball.x = Math.max(ball.r, Math.min(W - ball.r, ball.x));
+      ball.vx *= -1;
+      dg.sound('tick');
+    }
+    if (ball.y < ball.r) {
+      ball.y = ball.r;
+      ball.vy *= -1;
+      dg.sound('tick');
+    }
+    if (ball.y > H + 20) {
+      loseLife();
+      return;
+    }
+
+    const paddleHit = ball.vy > 0 &&
+      ball.x > paddle.x - ball.r &&
+      ball.x < paddle.x + paddle.w + ball.r &&
+      ball.y + ball.r > paddle.y &&
+      ball.y - ball.r < paddle.y + paddle.h;
+    if (paddleHit) {
+      const hit = (ball.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2);
+      const speed = Math.hypot(ball.vx, ball.vy) + .05;
+      ball.vx = hit * speed * .85;
+      ball.vy = -Math.max(4.2, speed * .88);
+      ball.y = paddle.y - ball.r - 1;
+      dg.sound('tick');
+    }
+
+    for (const b of bricks) {
+      if (!b.alive || !collideBrick(b)) continue;
+      b.hp--;
+      if (b.hp <= 0) {
+        b.alive = false;
+        addScore(5 + phase);
+        dg.sound('score');
+      } else {
+        dg.sound('tick');
+      }
+      const overlapX = Math.min(Math.abs(ball.x - b.x), Math.abs(ball.x - (b.x + b.w)));
+      const overlapY = Math.min(Math.abs(ball.y - b.y), Math.abs(ball.y - (b.y + b.h)));
+      if (overlapX < overlapY) ball.vx *= -1;
+      else ball.vy *= -1;
+      break;
+    }
+
+    if (bricks.every(b => !b.alive)) nextPhase();
+  }
+
+  function drawBackground(t) {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#111f3f');
+    grad.addColorStop(.7, '#0b1020');
+    grad.addColorStop(1, '#090d18');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(34,211,238,.08)';
+    for (let x = -40; x < W + 40; x += 42) {
+      ctx.fillRect(x + Math.sin(t / 600 + x) * 5, 36, 2, H - 96);
+    }
+  }
+
+  function drawBricks() {
+    bricks.forEach(b => {
+      if (!b.alive) return;
+      ctx.save();
+      ctx.shadowColor = b.color;
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = b.hp > 1 ? '#e6edf3' : b.color;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.fillStyle = 'rgba(255,255,255,.2)';
+      ctx.fillRect(b.x + 5, b.y + 4, b.w - 10, 3);
+      ctx.restore();
+    });
+  }
+
+  function drawPaddle() {
+    const grad = ctx.createLinearGradient(paddle.x, 0, paddle.x + paddle.w, 0);
+    grad.addColorStop(0, '#22d3ee');
+    grad.addColorStop(.5, '#4ade80');
+    grad.addColorStop(1, '#a78bfa');
+    ctx.save();
+    ctx.shadowColor = '#22d3ee';
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = grad;
+    ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+    ctx.restore();
+  }
+
+  function drawBall() {
+    ctx.save();
+    ctx.shadowColor = '#fbbf24';
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = '#fde68a';
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function draw(t = 0) {
+    drawBackground(t);
+    drawBricks();
+    drawPaddle();
+    drawBall();
+    if (ball.stuck && state === 'run') {
+      ctx.fillStyle = 'rgba(230,237,243,.7)';
+      ctx.font = '700 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Toque para lançar', W / 2, H - 92);
+    }
+  }
+
+  function loop(t) {
+    const dt = t - last;
+    last = t;
+    if (dt < 80) update();
+    draw(t);
+    requestAnimationFrame(loop);
+  }
+
+  startBtn.addEventListener('click', start);
+  launchBtn.addEventListener('click', launch);
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); setPaddleByClientX(e.clientX); launch(); });
+  cv.addEventListener('pointermove', e => { e.preventDefault(); setPaddleByClientX(e.clientX); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft') keys.left = true;
+    if (e.key === 'ArrowRight') keys.right = true;
+    if (e.code === 'Space' || e.key === 'ArrowUp') { e.preventDefault(); launch(); }
+  });
+  document.addEventListener('keyup', e => {
+    if (e.key === 'ArrowLeft') keys.left = false;
+    if (e.key === 'ArrowRight') keys.right = false;
+  });
+  [
+    [leftBtn, 'left'],
+    [rightBtn, 'right']
+  ].forEach(([button, key]) => {
+    const release = () => { keys[key] = false; };
+    button.addEventListener('pointerdown', e => { e.preventDefault(); keys[key] = true; });
+    button.addEventListener('pointerup', release);
+    button.addEventListener('pointerleave', release);
+    button.addEventListener('pointercancel', release);
+  });
+  window.addEventListener('dudu-reset', () => {
+    best = 0;
+    bestEl.textContent = '0';
+  });
+
+  newGame();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

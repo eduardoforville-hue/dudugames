@@ -19,6 +19,7 @@ Joguinhos do Dudu para passar o tempo — todos em HTML puro, sem dependências.
 | 👾 Space Invaders | https://eduardoforville-hue.github.io/dudugames/space-invaders/ |
 | 🚀 Golfe Cósmico | https://eduardoforville-hue.github.io/dudugames/golfe/ |
 | 🐤 Flappy Dudu | https://eduardoforville-hue.github.io/dudugames/flappy/ |
+| 🧱 Breakout Dudu | https://eduardoforville-hue.github.io/dudugames/breakout/ |
 
 ## Funcionalidades
 
