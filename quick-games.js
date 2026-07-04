@@ -282,7 +282,7 @@
     clearRoot();
     const cv = canvas(560, 360), ctx = cv.getContext('2d');
     const isWhack = kind === 'whack';
-    let score = 0, time = 30, items = [], raf, timer, active = false, holes = [];
+    let score = 0, time = 30, items = [], raf, timer, spawnTimer, active = false, holes = [];
     if (isWhack) {
       const grid = document.createElement('div');
       grid.className = 'quick-grid whack-grid';
@@ -294,12 +294,14 @@
       }
     }
     function start() {
+      clearInterval(timer); clearTimeout(spawnTimer); cancelAnimationFrame(raf);
       score = 0; time = 30; items = []; active = true; setScore(0); setAux('30s'); dg.markPlayed(game);
-      clearInterval(timer); timer = setInterval(() => { time--; setAux(time + 's'); if (time <= 0) end(); }, 1000);
+      if (isWhack) holes.forEach(h => h.textContent = '');
+      timer = setInterval(() => { time--; setAux(time + 's'); if (time <= 0) end(); }, 1000);
       if (isWhack) spawnWhack(); else loop();
     }
     function end() {
-      active = false; clearInterval(timer); cancelAnimationFrame(raf); saveScore(score); dg.sound('win');
+      active = false; clearInterval(timer); clearTimeout(spawnTimer); cancelAnimationFrame(raf); saveScore(score); dg.sound('win');
       if (score >= 30) dg.unlock(isWhack ? 'whack-30' : 'bolha-30');
       setMsg('Tempo! Pontuação: ' + score + '.');
     }
@@ -308,7 +310,7 @@
       holes.forEach(h => h.textContent = '');
       const i = Math.floor(Math.random() * holes.length);
       holes[i].textContent = '🎯';
-      setTimeout(spawnWhack, difficulty() === 'hard' ? 520 : difficulty() === 'easy' ? 900 : 700);
+      spawnTimer = setTimeout(spawnWhack, difficulty() === 'hard' ? 520 : difficulty() === 'easy' ? 900 : 700);
     }
     function hit(i) {
       if (!active || holes[i].textContent !== '🎯') return;
@@ -332,17 +334,21 @@
       const hitIndex = items.findIndex(b => Math.hypot(x - b.x, y - b.y) <= b.r + 6);
       if (hitIndex >= 0) { items.splice(hitIndex, 1); score++; setScore(score); dg.sound('score'); }
     });
-    cleanup = () => { clearInterval(timer); cancelAnimationFrame(raf); };
+    function drawReady() {
+      if (isWhack) holes.forEach(h => h.textContent = '');
+      else { ctx.fillStyle = '#0d1526'; ctx.fillRect(0,0,560,360); }
+    }
+    cleanup = () => { clearInterval(timer); clearTimeout(spawnTimer); cancelAnimationFrame(raf); };
     startBtn.onclick = start;
-    setMsg(isWhack ? 'Acerte o alvo antes que ele mude de lugar.' : 'Estoure o máximo de bolhas em 30 segundos.');
-    start();
+    setScore(0); setAux('30s'); drawReady();
+    setMsg(isWhack ? 'Aperte Jogar para começar. Acerte o alvo antes que ele mude.' : 'Aperte Jogar para começar. Estoure o máximo de bolhas em 30 segundos.');
   }
 
   function runGenius() {
     clearRoot();
     const colors = ['#4ade80','#22d3ee','#a78bfa','#fb7185'];
     const pad = document.createElement('div'); pad.className = 'genius-grid'; root.appendChild(pad);
-    let seq = [], input = [], showing = false, phase = 0;
+    let seq = [], input = [], showing = false, phase = 0, started = false;
     colors.forEach((c, i) => {
       const b = button('', 'genius-pad'); b.style.background = c; b.onclick = () => press(i); pad.appendChild(b);
     });
@@ -352,15 +358,21 @@
       input = []; phase++; seq.push(Math.floor(Math.random()*4)); setScore(phase); setAux('Fase ' + phase); saveScore(phase); if (phase >= 8) dg.unlock('genius-8');
       showing = true; seq.forEach((v, i) => setTimeout(() => flash(v), 400 + i * 430)); setTimeout(() => showing = false, 450 + seq.length * 430);
     }
+    function start() {
+      seq = []; input = []; phase = 0; started = true; dg.markPlayed(game);
+      setMsg('Observe a sequência e depois repita.');
+      next();
+    }
     function press(i) {
+      if (!started) { start(); return; }
       if (showing) return;
       dg.markPlayed(game); flash(i); input.push(i); dg.sound('tick');
       if (seq[input.length - 1] !== i) { dg.sound('fail'); setMsg('Errou! Aperte jogar para recomeçar.'); phase = 0; seq = []; return; }
       if (input.length === seq.length) { dg.sound('score'); setTimeout(next, 500); }
     }
-    startBtn.onclick = () => { seq = []; phase = 0; setMsg('Repita a sequência cada vez maior.'); next(); };
-    setMsg('Repita a sequência cada vez maior.');
-    next();
+    startBtn.onclick = start;
+    setScore(0); setAux('Fase 0');
+    setMsg('Aperte Recomeçar ou toque uma cor para iniciar a sequência.');
   }
 
   function runMemoryThemes() {
@@ -407,22 +419,29 @@
     clearRoot();
     const cv = canvas(450, 450), ctx = cv.getContext('2d');
     const N = 15, S = 30;
-    let p, ghosts, dots, walls, score, raf, dir = {x:0,y:0}, running = true;
+    let p, ghosts, dots, walls, score, raf, dir = {x:0,y:0}, running = false, active = false;
     function key(x,y){return x+','+y;}
     function reset() {
-      p = {x:1,y:1}; ghosts = [{x:13,y:13},{x:13,y:1}]; score = 0; running = true; dir = {x:0,y:0};
+      clearTimeout(raf);
+      p = {x:1,y:1}; ghosts = [{x:13,y:13},{x:13,y:1}]; score = 0; running = false; active = false; dir = {x:0,y:0};
       walls = new Set(); dots = new Set();
       for (let y=0;y<N;y++) for (let x=0;x<N;x++) {
         if (x===0||y===0||x===N-1||y===N-1||(x%4===0&&y>2&&y<12)||(y%5===0&&x>2&&x<12)) walls.add(key(x,y));
         else dots.add(key(x,y));
       }
-      dots.delete(key(1,1)); setScore(0); setAux(dots.size + ' pontos'); dg.markPlayed(game);
+      dots.delete(key(1,1)); setScore(0); setAux(dots.size + ' pontos'); draw();
+    }
+    function start() {
+      if (active) return;
+      active = true; running = true; dg.markPlayed(game);
+      setMsg('Use as setas para começar a se mover.');
+      tick();
     }
     function move(ent, d) {
       const nx=ent.x+d.x, ny=ent.y+d.y; if (!walls.has(key(nx,ny))) { ent.x=nx; ent.y=ny; }
     }
     function tick() {
-      if (running) {
+      if (running && (dir.x || dir.y)) {
         move(p, dir);
         if (dots.delete(key(p.x,p.y))) { score++; setScore(score); setAux(dots.size + ' pontos'); dg.sound('score'); }
         ghosts.forEach(g => {
@@ -432,7 +451,7 @@
         if (ghosts.some(g => g.x===p.x&&g.y===p.y)) { running=false; saveScore(score); dg.sound('fail'); setMsg('Pegaram você!'); }
         if (!dots.size) { running=false; saveScore(score); dg.unlock('pacman-clear'); dg.sound('win'); setMsg('Labirinto limpo!'); }
       }
-      draw(); raf=setTimeout(tick, difficulty()==='hard'?150:difficulty()==='easy'?230:190);
+      draw(); if (active) raf=setTimeout(tick, difficulty()==='hard'?150:difficulty()==='easy'?230:190);
     }
     function draw() {
       ctx.fillStyle='#0d1526'; ctx.fillRect(0,0,450,450);
@@ -440,13 +459,20 @@
       dots.forEach(k=>{const [x,y]=k.split(',').map(Number); ctx.fillStyle='#fbbf24'; ctx.beginPath(); ctx.arc(x*S+15,y*S+15,3,0,Math.PI*2); ctx.fill();});
       ctx.fillStyle='#fde047'; ctx.beginPath(); ctx.arc(p.x*S+15,p.y*S+15,10,0,Math.PI*2); ctx.fill();
       ctx.fillStyle='#fb7185'; ghosts.forEach(g=>ctx.fillRect(g.x*S+6,g.y*S+6,18,18));
+      if (!active) overlay(ctx, 'Pronto para jogar', 'Aperte Jogar ou uma seta para iniciar.');
     }
-    function onKey(e){const m={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0}}; if(m[e.key]){e.preventDefault();dir=m[e.key];}}
+    function overlay(ctx, text, sub) {
+      ctx.fillStyle='rgba(3,7,18,.68)'; ctx.fillRect(0,172,450,92);
+      ctx.fillStyle='#e6edf3'; ctx.font='800 24px sans-serif'; ctx.textAlign='center'; ctx.fillText(text,225,210);
+      ctx.font='600 13px sans-serif'; ctx.fillStyle='#cbd5e1'; ctx.fillText(sub,225,236);
+    }
+    function onKey(e){const m={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0}}; if(m[e.key]){e.preventDefault();dir=m[e.key];start();}}
     document.addEventListener('keydown', onKey);
     cleanup=()=>{clearTimeout(raf);document.removeEventListener('keydown',onKey);};
-    startBtn.onclick=()=>{clearTimeout(raf);reset();tick();};
-    setMsg('Coma os pontos e fuja dos fantasmas.');
-    reset(); tick();
+    cv.addEventListener('pointerdown', start);
+    startBtn.onclick=()=>{reset();start();};
+    setMsg('Coma os pontos e fuja dos fantasmas. Aperte Jogar ou uma seta para começar.');
+    reset();
   }
 
   const suits = ['♠','♥','♦','♣'];

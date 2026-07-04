@@ -344,11 +344,19 @@
   function runGoalkeeper() {
     const [cv, ctx] = setupCanvas();
     const bar = setupActions([['←', 'left'], ['Defender', 'save'], ['→', 'right']]);
-    let score = 0, keeperX = 320, dive = 0, shot;
+    let score = 0, keeperX = 320, dive = 0, shot, active = false;
     function newShot() { shot = { x: rnd(240, 400), y: 338, tx: rnd(210, 430), ty: rnd(60, 118), t: 0 }; }
+    function start() {
+      score = 0; keeperX = 320; dive = 0; active = true; setScore(0); setAux('0 defesas'); newShot(); dg.markPlayed(game);
+    }
     function save() { dive = 24; }
     function draw() {
       pitch(ctx, 'night'); goal(ctx); player(ctx, keeperX, 78 - dive, '#fbbf24'); dive = Math.max(0, dive - 1.5);
+      if (!active) {
+        drawScoreBug(ctx, '0 defesas');
+        overlay(ctx, 'Pronto para defender', 'Aperte Novo jogo ou toque no gol para começar.');
+        return;
+      }
       shot.t += .018 * diffSpeed();
       const x = shot.x + (shot.tx - shot.x) * shot.t;
       const y = shot.y + (shot.ty - shot.y) * shot.t;
@@ -360,24 +368,26 @@
       }
       drawScoreBug(ctx, score + ' defesas');
     }
-    cv.addEventListener('pointerdown', e => { keeperX = clamp(pointerPos(cv, e).x, 210, 430); save(); });
-    bar.addEventListener('click', e => { const a = e.target.dataset.action; if (a === 'left') keeperX -= 38; if (a === 'right') keeperX += 38; if (a === 'save') save(); keeperX = clamp(keeperX, 210, 430); });
-    startBtn.onclick = () => { score = 0; setScore(0); newShot(); dg.markPlayed(game); };
-    setMsg('Mova o goleiro e toque em Defender no momento do chute.');
-    newShot(); dg.markPlayed(game); loop(draw);
+    cv.addEventListener('pointerdown', e => { if (!active) start(); keeperX = clamp(pointerPos(cv, e).x, 210, 430); save(); });
+    bar.addEventListener('click', e => { if (!active) start(); const a = e.target.dataset.action; if (a === 'left') keeperX -= 38; if (a === 'right') keeperX += 38; if (a === 'save') save(); keeperX = clamp(keeperX, 210, 430); });
+    startBtn.onclick = start;
+    setScore(0); setAux('0 defesas'); setMsg('Aperte Novo jogo para começar. Depois mova o goleiro e defenda no timing.');
+    loop(draw);
   }
 
   function runDribble() {
     const [cv, ctx] = setupCanvas();
     const bar = setupActions([['←', 'left'], ['Drible', 'dribble'], ['→', 'right']]);
-    let lane = 1, score = 0, inv = 0, obstacles = [], frame = 0, over = false;
+    let lane = 1, score = 0, inv = 0, obstacles = [], frame = 0, over = false, active = false;
     const lanes = [210, 320, 430];
-    function reset() { lane = 1; score = frame = 0; inv = 0; obstacles = []; over = false; setScore(0); dg.markPlayed(game); }
+    function reset() { lane = 1; score = frame = 0; inv = 0; obstacles = []; over = false; active = true; setScore(0); setAux('0m'); dg.markPlayed(game); }
     function draw() {
-      pitch(ctx); frame++;
-      if (!over && frame % Math.round(62 / diffSpeed()) === 0) obstacles.push({ lane: Math.floor(Math.random()*3), y: -30 });
-      obstacles.forEach(o => o.y += 4.4 * diffSpeed()); obstacles = obstacles.filter(o => o.y < 430);
-      if (!over) {
+      pitch(ctx);
+      if (active) frame++;
+      if (active && !over && frame % Math.round(62 / diffSpeed()) === 0) obstacles.push({ lane: Math.floor(Math.random()*3), y: -30 });
+      if (active) obstacles.forEach(o => o.y += 4.4 * diffSpeed());
+      obstacles = obstacles.filter(o => o.y < 430);
+      if (active && !over) {
         score = Math.floor(frame / 8); setScore(score); setAux(score + 'm'); saveScore(score); inv = Math.max(0, inv - 1);
         if (score >= 120) dg.unlock('drible-120');
         if (obstacles.some(o => o.lane === lane && o.y > 270 && o.y < 336 && inv <= 0)) { over = true; dg.sound('fail'); }
@@ -385,29 +395,32 @@
       for (let i = 0; i < 3; i++) { ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.moveTo(lanes[i], 30); ctx.lineTo(lanes[i], 350); ctx.stroke(); }
       obstacles.forEach(o => player(ctx, lanes[o.lane], o.y, '#fb7185'));
       player(ctx, lanes[lane], 318, inv ? '#fbbf24' : '#22d3ee'); ball(ctx, lanes[lane] + 18, 338, 9); drawScoreBug(ctx, score + 'm');
+      if (!active) overlay(ctx, 'Pronto para correr', 'Aperte Novo jogo ou use os controles para começar.');
       if (over) overlay(ctx, 'Perdeu a bola', 'Toque em Novo jogo.');
     }
-    bar.addEventListener('click', e => { const a = e.target.dataset.action; if (a === 'left') lane--; if (a === 'right') lane++; if (a === 'dribble') inv = 34; lane = clamp(lane, 0, 2); });
-    startBtn.onclick = reset; setMsg('Troque de faixa e use Drible para passar pelos marcadores.'); reset(); loop(draw);
+    bar.addEventListener('click', e => { if (!active) reset(); const a = e.target.dataset.action; if (a === 'left') lane--; if (a === 'right') lane++; if (a === 'dribble') inv = 34; lane = clamp(lane, 0, 2); });
+    startBtn.onclick = reset; setScore(0); setAux('0m'); setMsg('Aperte Novo jogo para começar. Troque de faixa e use Drible para passar pelos marcadores.'); loop(draw);
   }
 
   function runTargetShot() {
     const [cv, ctx] = setupCanvas();
-    let score = 0, time = 30, aim = { x: 320, y: 88 }, tgt = { x: 320, y: 76 }, timer = 0;
+    let score = 0, time = 30, aim = { x: 320, y: 88 }, tgt = { x: 320, y: 76, r: 22 }, timer = 0, active = false;
     function nextTarget() { tgt = { x: rnd(220, 420), y: rnd(56, 112), r: rnd(16, 28) }; }
     function shoot() {
+      if (!active) start();
       const hit = Math.hypot(aim.x - tgt.x, aim.y - tgt.y) < tgt.r + 8;
       if (hit) { score += Math.round(30 - tgt.r); dg.sound('score'); nextTarget(); if (score >= 120) dg.unlock('alvo-120'); } else dg.sound('fail');
       setScore(score); saveScore(score);
     }
-    function reset() { score = 0; time = 30; timer = performance.now(); setScore(0); nextTarget(); dg.markPlayed(game); }
+    function start() { score = 0; time = 30; active = true; timer = performance.now(); setScore(0); setAux('30s'); nextTarget(); dg.markPlayed(game); }
     function draw(ts) {
       pitch(ctx, 'night'); goal(ctx); target(ctx, tgt.x, tgt.y, tgt.r); target(ctx, aim.x, aim.y, 12); player(ctx, 298, 330, '#22d3ee'); ball(ctx, 320, 330);
-      if (ts - timer > 1000) { time--; timer = ts; setAux(time + 's'); if (time <= 0) { saveScore(score); reset(); } }
+      if (active && ts - timer > 1000) { time--; timer = ts; setAux(time + 's'); if (time <= 0) { active = false; saveScore(score); setAux('30s'); } }
       drawScoreBug(ctx, score + ' pts');
+      if (!active) overlay(ctx, time <= 0 && score ? 'Tempo!' : 'Pronto para mirar', 'Aperte Novo jogo ou toque no alvo para começar.');
     }
     cv.addEventListener('pointerdown', e => { aim = pointerPos(cv, e); if (aim.y < 150) shoot(); });
-    startBtn.onclick = reset; setMsg('Toque nos alvos dentro do gol para chutar.'); reset(); loop(draw);
+    startBtn.onclick = start; setScore(0); setAux('30s'); setMsg('Aperte Novo jogo para começar. Toque nos alvos dentro do gol para chutar.'); loop(draw);
   }
 
   function runCup() {
