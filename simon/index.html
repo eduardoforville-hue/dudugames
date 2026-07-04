@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16213e">
+<title>🔴 Simon · DuduGames</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  * { box-sizing: border-box; }
+  body { min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .simon-board { display: grid; grid-template-columns: repeat(2, min(150px, 38vw)); gap: 12px; padding: 12px; width: fit-content; }
+  .pad { height: min(150px, 38vw); border: 0; border-radius: 18px; opacity: .72; cursor: pointer; transition: opacity .12s, transform .12s, filter .12s; }
+  .pad.on { opacity: 1; transform: scale(.96); filter: brightness(1.35); }
+  .p0 { background: #22c55e; } .p1 { background: #ef4444; } .p2 { background: #3b82f6; } .p3 { background: #f59e0b; }
+</style>
+</head>
+<body>
+<div class="game-wrap">
+  <a class="back" href="../">← DuduGames</a>
+  <h1 class="game-title">🔴 Simon</h1>
+  <div class="by">by DuduGames</div>
+  <div class="game-hud"><span>Fase: <b id="level">0</b></span><span>Recorde: <b id="best">0</b></span></div>
+  <div id="board" class="game-board simon-board"></div>
+  <div class="game-actions"><button class="btn" id="start">▶ Começar</button></div>
+  <p class="game-message" id="msg">Repita a sequência de luzes.</p>
+</div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const dg = DuduGames, board = document.getElementById('board'), levelEl = document.getElementById('level'), bestEl = document.getElementById('best'), msg = document.getElementById('msg');
+  const speeds = { easy: 720, normal: 560, hard: 390 };
+  let seq = [], pos = 0, playing = false, best = dg.getRecord('simon');
+  bestEl.textContent = best; dg.installControls({ difficulty: true });
+  for (let i = 0; i < 4; i++) {
+    const b = document.createElement('button'); b.className = 'pad p' + i; b.type = 'button';
+    b.addEventListener('click', () => press(i)); board.appendChild(b);
+  }
+  const pads = [...document.querySelectorAll('.pad')];
+  function flash(i) { pads[i].classList.add('on'); dg.sound('score'); setTimeout(() => pads[i].classList.remove('on'), 220); }
+  function start() { seq = []; next(); dg.markPlayed('simon'); }
+  function next() {
+    playing = true; pos = 0; seq.push(Math.floor(Math.random()*4)); levelEl.textContent = seq.length; msg.textContent = 'Observe...';
+    const delay = speeds[dg.getDifficulty()] || speeds.normal;
+    seq.forEach((v, i) => setTimeout(() => flash(v), 450 + i * delay));
+    setTimeout(() => { playing = false; msg.textContent = 'Sua vez.'; }, 450 + seq.length * delay);
+    if (dg.setRecord('simon', seq.length)) { best = seq.length; bestEl.textContent = best; }
+    if (seq.length >= 5) dg.unlock('simon-5');
+  }
+  function press(i) {
+    if (playing || !seq.length) return;
+    flash(i);
+    if (seq[pos] !== i) { msg.textContent = 'Errou! Comece de novo.'; seq = []; pos = 0; levelEl.textContent = '0'; dg.sound('fail'); return; }
+    pos++;
+    if (pos === seq.length) setTimeout(next, 650);
+  }
+  document.getElementById('start').addEventListener('click', start);
+  window.addEventListener('dudu-reset', () => { best = 0; bestEl.textContent = '0'; });
+})();
+</script>
+</body>
+</html>

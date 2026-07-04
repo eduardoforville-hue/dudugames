@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16213e">
 <title>🧠 Jogo da Memória · DuduGames</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -53,8 +56,8 @@
   .stage { position: relative; display: inline-block; }
   .grid {
     display: grid;
-    grid-template-columns: repeat(4, min(80px, 20vw));
-    grid-template-rows: repeat(4, min(80px, 20vw));
+    grid-template-columns: repeat(var(--cols, 4), min(80px, calc((100vw - 56px) / var(--cols, 4))));
+    grid-auto-rows: min(80px, calc((100vw - 56px) / var(--cols, 4)));
     gap: 10px;
   }
   .card {
@@ -133,6 +136,7 @@
   .actions { margin-top: 14px; }
   .actions .btn { margin-top: 0; }
 </style>
+<link rel="stylesheet" href="../shared.css">
 </head>
 <body>
 <div class="wrap">
@@ -156,14 +160,17 @@
     <button class="btn" id="restart">🔄 Reiniciar</button>
   </div>
 </div>
+<script src="../shared.js"></script>
 <script>
 (() => {
-  const EMOJIS = ['🐍','🍎','🚀','🌵','🦖','🍕','⚽','🎲','🐙','🌈','🍩','🎸','🐬','🌋','🛸','🍿'];
-  const HS_KEY = 'dudu-memoria-recorde';
-  const storage = {
-    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-    set(k, v) { try { localStorage.setItem(k, v); } catch {} }
+  const dg = window.DuduGames;
+  const levels = {
+    easy: { pairs: 6, cols: 3 },
+    normal: { pairs: 8, cols: 4 },
+    hard: { pairs: 10, cols: 5 }
   };
+  const level = levels[dg.getDifficulty()] || levels.normal;
+  const EMOJIS = ['🐍','🍎','🚀','🌵','🦖','🍕','⚽','🎲','🐙','🌈','🍩','🎸','🐬','🌋','🛸','🍿'];
 
   const grid = document.getElementById('grid');
   const movesEl = document.getElementById('moves');
@@ -173,9 +180,11 @@
   const ovTitle = document.getElementById('ov-title');
   const ovMsg = document.getElementById('ov-msg');
 
-  let first = null, lock = false, moves = 0, matched = 0;
+  dg.installControls({ difficulty: true, onDifficultyChange: () => location.reload() });
+
+  let first = null, lock = false, moves = 0, matched = 0, started = false;
   let seconds = 0, timer = null;
-  let best = +storage.get(HS_KEY) || 0;
+  let best = dg.getRecord('memory');
   if (best) bestEl.textContent = best;
 
   function shuffle(arr) {
@@ -205,12 +214,13 @@
 
   function deal() {
     stopTimer();
-    first = null; lock = false; moves = 0; matched = 0; seconds = 0;
+    first = null; lock = false; moves = 0; matched = 0; seconds = 0; started = false;
     movesEl.textContent = '0';
     timeEl.textContent = '0:00';
     overlay.classList.add('hidden');
     grid.innerHTML = '';
-    const pool = shuffle([...EMOJIS]).slice(0, 8);
+    grid.style.setProperty('--cols', level.cols);
+    const pool = shuffle([...EMOJIS]).slice(0, level.pairs);
     const cards = shuffle([...pool, ...pool]);
     cards.forEach(emoji => {
       const btn = document.createElement('button');
@@ -226,7 +236,12 @@
   function flip(card) {
     if (lock || card === first) return;
     if (card.classList.contains('matched') || card.classList.contains('open')) return;
+    if (!started) {
+      started = true;
+      dg.markPlayed('memory');
+    }
     startTimer();
+    dg.sound('tick');
     card.classList.add('open');
     if (!first) {
       first = card;
@@ -241,7 +256,8 @@
       card.classList.remove('open');
       first = null;
       matched++;
-      if (matched === 8) win();
+      dg.sound('score');
+      if (matched === level.pairs) win();
     } else {
       lock = true;
       const a = first, b = card;
@@ -256,12 +272,13 @@
 
   function win() {
     stopTimer();
-    const record = !best || moves < best;
+    const record = dg.setRecord('memory', moves);
     if (record) {
       best = moves;
-      storage.set(HS_KEY, best);
       bestEl.textContent = best;
     }
+    dg.unlock('memory-win');
+    dg.sound('win');
     ovTitle.textContent = record ? '🏆 Novo recorde!' : '🎉 Você venceu!';
     ovMsg.textContent = 'Encontrou todos os pares em ' + moves + ' jogadas e ' + fmt(seconds) + '.' +
       (record ? ' Melhor marca até agora!' : ' Seu recorde é ' + best + ' jogadas.');
@@ -270,6 +287,10 @@
 
   document.getElementById('restart').addEventListener('click', deal);
   document.getElementById('ov-btn').addEventListener('click', deal);
+  window.addEventListener('dudu-reset', () => {
+    best = 0;
+    bestEl.textContent = '—';
+  });
   deal();
 })();
 </script>

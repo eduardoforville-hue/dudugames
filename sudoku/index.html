@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16213e">
+<title>🔢 Sudoku Mini · DuduGames</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  * { box-sizing: border-box; }
+  body { min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .sudoku { display: grid; grid-template-columns: repeat(4, 62px); gap: 6px; padding: 12px; width: fit-content; }
+  .sudoku input { width: 62px; height: 62px; text-align: center; font-size: 28px; }
+  .sudoku input:nth-child(2), .sudoku input:nth-child(6), .sudoku input:nth-child(10), .sudoku input:nth-child(14) { margin-right: 8px; }
+  .sudoku input:nth-child(n+9):nth-child(-n+12) { margin-top: 8px; }
+  .fixed { opacity: .78; }
+</style>
+</head>
+<body>
+<div class="game-wrap">
+  <a class="back" href="../">← DuduGames</a>
+  <h1 class="game-title">🔢 Sudoku Mini</h1>
+  <div class="by">by DuduGames</div>
+  <div class="game-hud"><span>Tempo: <b id="time">0</b>s</span><span>Recorde: <b id="best">—</b></span></div>
+  <div id="grid" class="game-board sudoku"></div>
+  <div class="game-actions"><button class="btn" id="check">✓ Conferir</button><button class="btn" id="restart">🔄 Novo</button></div>
+  <p class="game-message" id="msg">Preencha com números de 1 a 4.</p>
+</div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const dg = DuduGames, solution = [1,2,3,4,3,4,1,2,2,1,4,3,4,3,2,1];
+  const givens = { easy: 10, normal: 8, hard: 6 };
+  const grid = document.getElementById('grid'), timeEl = document.getElementById('time'), bestEl = document.getElementById('best'), msg = document.getElementById('msg');
+  let timer = null, seconds = 0, best = dg.getRecord('sudoku');
+  bestEl.textContent = best || '—'; dg.installControls({ difficulty: true, onDifficultyChange: reset });
+  function startTimer() { if (!timer) timer = setInterval(() => { seconds++; timeEl.textContent = seconds; }, 1000); }
+  function stopTimer() { clearInterval(timer); timer = null; }
+  function reset() {
+    stopTimer(); seconds = 0; timeEl.textContent = '0'; msg.textContent = 'Preencha com números de 1 a 4.'; grid.innerHTML = '';
+    const keep = new Set(); while (keep.size < (givens[dg.getDifficulty()] || 8)) keep.add(Math.floor(Math.random()*16));
+    solution.forEach((n,i) => {
+      const input = document.createElement('input'); input.className = 'game-cell'; input.inputMode = 'numeric'; input.maxLength = 1;
+      if (keep.has(i)) { input.value = n; input.disabled = true; input.classList.add('fixed'); }
+      input.addEventListener('input', () => { input.value = input.value.replace(/[^1-4]/g, ''); startTimer(); dg.markPlayed('sudoku'); });
+      grid.appendChild(input);
+    });
+  }
+  function check() {
+    const ok = [...grid.children].every((input, i) => Number(input.value) === solution[i]);
+    if (!ok) { msg.textContent = 'Ainda tem número fora do lugar.'; dg.sound('fail'); return; }
+    stopTimer(); dg.unlock('sudoku-win'); dg.sound('win');
+    if (dg.setRecord('sudoku', seconds)) { best = seconds; bestEl.textContent = best; msg.textContent = `Novo recorde: ${seconds}s!`; }
+    else msg.textContent = `Resolvido em ${seconds}s!`;
+  }
+  document.getElementById('check').addEventListener('click', check);
+  document.getElementById('restart').addEventListener('click', reset);
+  window.addEventListener('dudu-reset', () => { best = 0; bestEl.textContent = '—'; });
+  reset();
+})();
+</script>
+</body>
+</html>

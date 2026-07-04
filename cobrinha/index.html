@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16213e">
 <title>🐍 Cobrinha · DuduGames</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -110,6 +113,7 @@
     .hint-mobile { display: inline; }
   }
 </style>
+<link rel="stylesheet" href="../shared.css">
 </head>
 <body>
 <div class="wrap">
@@ -135,13 +139,20 @@
   </div>
   <p class="hint"><span class="hint-pc">Setas ou WASD para mover · Espaço pausa</span><span class="hint-mobile">Deslize o dedo na tela ou use os botões</span></p>
 </div>
+<script src="../shared.js"></script>
 <script>
 (() => {
+  const dg = window.DuduGames;
+  const levels = {
+    easy: { start: 180, min: 90, dec: 2 },
+    normal: { start: 150, min: 70, dec: 3 },
+    hard: { start: 115, min: 55, dec: 4 }
+  };
+  const level = levels[dg.getDifficulty()] || levels.normal;
   const cv = document.getElementById('game');
   const ctx = cv.getContext('2d');
   const N = 21;
   const CELL = cv.width / N;
-  const HS_KEY = 'cobrinha-recorde';
 
   const scoreEl = document.getElementById('score');
   const highEl = document.getElementById('high');
@@ -149,14 +160,11 @@
   const ovTitle = document.getElementById('ov-title');
   const ovMsg = document.getElementById('ov-msg');
 
-  const storage = {
-    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-    set(k, v) { try { localStorage.setItem(k, v); } catch {} }
-  };
+  dg.installControls({ difficulty: true, onDifficultyChange: () => location.reload() });
 
   let snake, dir, nextDir, food, score, stepMs;
   let state = 'menu'; // menu | run | pause | over
-  let best = +storage.get(HS_KEY) || 0;
+  let best = dg.getRecord('snake');
   let last = 0, acc = 0, now = 0;
   highEl.textContent = best;
 
@@ -165,7 +173,7 @@
     dir = {x:1,y:0};
     nextDir = {x:1,y:0};
     score = 0;
-    stepMs = 150;
+    stepMs = level.start;
     acc = 0;
     scoreEl.textContent = '0';
     placeFood();
@@ -178,6 +186,8 @@
   }
 
   function start() {
+    dg.markPlayed('snake');
+    dg.sound('tick');
     reset();
     state = 'run';
     overlay.classList.add('hidden');
@@ -195,12 +205,12 @@
 
   function gameOver() {
     state = 'over';
-    const record = score > best;
+    const record = dg.setRecord('snake', score);
     if (record) {
       best = score;
-      storage.set(HS_KEY, best);
       highEl.textContent = best;
     }
+    dg.sound(record ? 'win' : 'fail');
     show('💀 Fim de jogo!', record
       ? `🏆 Novo recorde: ${score} pontos! Espaço para jogar de novo.`
       : `Você fez ${score} pontos. Espaço para tentar de novo.`);
@@ -215,19 +225,23 @@
   function step() {
     dir = nextDir;
     const h = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+    const willEat = h.x === food.x && h.y === food.y;
+    const body = willEat ? snake : snake.slice(0, -1);
     if (h.x < 0 || h.y < 0 || h.x >= N || h.y >= N ||
-        snake.some(s => s.x === h.x && s.y === h.y)) {
+        body.some(s => s.x === h.x && s.y === h.y)) {
       gameOver();
       return;
     }
     snake.unshift(h);
-    if (h.x === food.x && h.y === food.y) {
+    if (willEat) {
       score += 10;
       scoreEl.textContent = score;
       scoreEl.classList.remove('pop');
       void scoreEl.offsetWidth;
       scoreEl.classList.add('pop');
-      if (stepMs > 70) stepMs -= 3;
+      dg.sound('score');
+      if (score >= 50) dg.unlock('snake-50');
+      if (stepMs > level.min) stepMs -= level.dec;
       placeFood();
     } else {
       snake.pop();
@@ -337,6 +351,10 @@
   });
 
   overlay.addEventListener('click', action);
+  window.addEventListener('dudu-reset', () => {
+    best = 0;
+    highEl.textContent = '0';
+  });
 
   document.querySelectorAll('.dpad button').forEach(b => {
     const [x, y] = b.dataset.dir.split(',').map(Number);

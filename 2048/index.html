@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16213e">
 <title>🔢 2048 · DuduGames</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -116,6 +119,7 @@
   .actions { margin-top: 14px; }
   .hint { margin-top: 12px; font-size: 13px; color: #64748b; }
 </style>
+<link rel="stylesheet" href="../shared.css">
 </head>
 <body>
 <div class="wrap">
@@ -139,15 +143,18 @@
   </div>
   <p class="hint">Setas ou WASD · No celular, deslize o dedo</p>
 </div>
+<script src="../shared.js"></script>
 <script>
 (() => {
+  const dg = window.DuduGames;
+  const levels = {
+    easy: { startTiles: 2, chance4: 0 },
+    normal: { startTiles: 2, chance4: 0.1 },
+    hard: { startTiles: 3, chance4: 0.25 }
+  };
+  const level = levels[dg.getDifficulty()] || levels.normal;
   const SIZE = 4, GAP = 10, BASE_CELL = 78;
   let CELL = BASE_CELL;
-  const HS_KEY = 'dudu-2048-recorde';
-  const storage = {
-    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-    set(k, v) { try { localStorage.setItem(k, v); } catch {} }
-  };
 
   const board = document.getElementById('board');
   const scoreEl = document.getElementById('score');
@@ -166,8 +173,10 @@
     2048: ['#edc22e', '#4b3a08']
   };
 
+  dg.installControls({ difficulty: true, onDifficultyChange: () => location.reload() });
+
   let tiles = [], nextId = 1, score = 0, lock = false, over = false, won = false;
-  let best = +storage.get(HS_KEY) || 0;
+  let best = dg.getRecord('game2048');
   bestEl.textContent = best;
 
   const bgCells = [];
@@ -224,7 +233,7 @@
         if (!tileAt(x, y)) empty.push({ x, y });
     if (!empty.length) return;
     const { x, y } = empty[Math.floor(Math.random() * empty.length)];
-    const t = { id: nextId++, x, y, v: Math.random() < 0.9 ? 2 : 4 };
+    const t = { id: nextId++, x, y, v: Math.random() < level.chance4 ? 4 : 2 };
     t.el = document.createElement('div');
     t.el.className = 'tile pop';
     t.el.style.width = CELL + 'px';
@@ -238,11 +247,11 @@
   function addScore(n) {
     score += n;
     scoreEl.textContent = score;
-    if (score > best) {
+    if (dg.setRecord('game2048', score)) {
       best = score;
       bestEl.textContent = best;
-      storage.set(HS_KEY, best);
     }
+    dg.sound('score');
   }
 
   function canMove() {
@@ -255,8 +264,12 @@
     return false;
   }
 
+  function overlayOpen() {
+    return !overlay.classList.contains('hidden');
+  }
+
   function move(dx, dy) {
-    if (lock || over) return;
+    if (lock || over || overlayOpen()) return;
     const merges = [];
     let movedAny = false;
 
@@ -299,8 +312,10 @@
         paint(m.winner);
         m.winner.el.classList.add('pop');
         addScore(m.winner.v);
+        if (m.winner.v >= 128) dg.unlock('2048-128');
         if (m.winner.v === 2048 && !won) {
           won = true;
+          dg.sound('win');
           ovTitle.textContent = '🏆 2048!';
           ovMsg.textContent = 'Você chegou lá com ' + score + ' pontos! Pode continuar jogando para ir além.';
           ovBtn.textContent = 'Continuar';
@@ -311,6 +326,7 @@
       spawn();
       if (!canMove()) {
         over = true;
+        dg.sound('fail');
         ovTitle.textContent = '💀 Fim de jogo!';
         ovMsg.textContent = 'Você fez ' + score + ' pontos.' + (score >= best && score > 0 ? ' 🏆 Recorde!' : ' Seu recorde é ' + best + '.');
         ovBtn.textContent = 'Jogar de novo';
@@ -322,13 +338,13 @@
   }
 
   function reset() {
+    dg.markPlayed('game2048');
     tiles.forEach(t => t.el.remove());
     tiles = [];
     score = 0; over = false; won = false; lock = false;
     scoreEl.textContent = '0';
     overlay.classList.add('hidden');
-    spawn();
-    spawn();
+    for (let i = 0; i < level.startTiles; i++) spawn();
   }
 
   document.addEventListener('keydown', e => {
@@ -362,6 +378,10 @@
 
   document.getElementById('restart').addEventListener('click', reset);
   ovBtn.onclick = reset;
+  window.addEventListener('dudu-reset', () => {
+    best = 0;
+    bestEl.textContent = '0';
+  });
   layout();
   reset();
 })();

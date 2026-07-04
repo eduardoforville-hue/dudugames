@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16213e">
+<title>🔤 Forca · DuduGames</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  * { box-sizing: border-box; }
+  body { min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .word { margin: 20px 0; font-size: clamp(30px, 9vw, 48px); letter-spacing: 8px; font-weight: 800; }
+  .letters { display: grid; grid-template-columns: repeat(7, minmax(34px, 1fr)); gap: 7px; max-width: 420px; margin: 0 auto; }
+  .letters button { height: 38px; }
+  .wrong { font-size: 42px; min-height: 54px; }
+</style>
+</head>
+<body>
+<div class="game-wrap">
+  <a class="back" href="../">← DuduGames</a>
+  <h1 class="game-title">🔤 Forca</h1>
+  <div class="by">by DuduGames</div>
+  <div class="game-hud"><span>Erros: <b id="miss">0</b>/<b id="max">6</b></span><span>Vitórias: <b id="wins">0</b></span><span>Recorde: <b id="best">0</b></span></div>
+  <div class="wrong" id="face">🙂</div>
+  <div class="word" id="word"></div>
+  <div class="letters" id="letters"></div>
+  <div class="game-actions"><button class="btn" id="restart">🔄 Nova palavra</button></div>
+  <p class="game-message" id="msg">Adivinhe a palavra.</p>
+</div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const dg = DuduGames, words = ['JOGO','COBRA','MEMORIA','NUMERO','BLOCO','ARCADE','DUDU','TECLADO','PIXEL','VITORIA','FAMILIA','BRASIL'];
+  const maxByLevel = { easy: 8, normal: 6, hard: 4 };
+  const wordEl = document.getElementById('word'), lettersEl = document.getElementById('letters'), missEl = document.getElementById('miss'), maxEl = document.getElementById('max'), winsEl = document.getElementById('wins'), bestEl = document.getElementById('best'), msg = document.getElementById('msg'), face = document.getElementById('face');
+  let word, guessed, misses, maxMiss, wins = 0, over = false, best = dg.getRecord('forca');
+  bestEl.textContent = best; dg.installControls({ difficulty: true, onDifficultyChange: reset });
+  function reset() {
+    word = words[Math.floor(Math.random()*words.length)]; guessed = new Set(); misses = 0; over = false; maxMiss = maxByLevel[dg.getDifficulty()] || 6;
+    maxEl.textContent = maxMiss; missEl.textContent = '0'; msg.textContent = 'Adivinhe a palavra.'; face.textContent = '🙂'; render();
+  }
+  function render() {
+    wordEl.textContent = [...word].map(ch => guessed.has(ch) ? ch : '_').join('');
+    lettersEl.innerHTML = '';
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(ch => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'game-cell'; b.textContent = ch; b.disabled = guessed.has(ch) || over; b.addEventListener('click', () => guess(ch)); lettersEl.appendChild(b);
+    });
+  }
+  function guess(ch) {
+    if (over) return; dg.markPlayed('forca'); guessed.add(ch);
+    if (!word.includes(ch)) { misses++; missEl.textContent = misses; face.textContent = ['🙂','😬','😟','😨','😵','💀'][Math.min(misses,5)] || '💀'; dg.sound('fail'); }
+    else dg.sound('score');
+    if ([...word].every(c => guessed.has(c))) return win();
+    if (misses >= maxMiss) return lose();
+    render();
+  }
+  function win() { over = true; wins++; winsEl.textContent = wins; msg.textContent = 'Você salvou a palavra!'; dg.unlock('forca-win'); dg.sound('win'); if (dg.setRecord('forca', wins)) { best = wins; bestEl.textContent = best; } render(); }
+  function lose() { over = true; wins = 0; winsEl.textContent = '0'; msg.textContent = 'A palavra era ' + word + '.'; face.textContent = '💀'; render(); }
+  document.getElementById('restart').addEventListener('click', reset);
+  window.addEventListener('dudu-reset', () => { best = 0; wins = 0; bestEl.textContent = winsEl.textContent = '0'; });
+  reset();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16213e">
+<title>🏓 Pong · DuduGames</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  * { box-sizing: border-box; }
+  body { min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  canvas { max-width: 100%; aspect-ratio: 4 / 3; }
+</style>
+</head>
+<body>
+<div class="game-wrap wide">
+  <a class="back" href="../">← DuduGames</a>
+  <h1 class="game-title">🏓 Pong</h1>
+  <div class="by">by DuduGames</div>
+  <div class="game-hud"><span>Pontos: <b id="score">0</b></span><span>Recorde: <b id="best">0</b></span></div>
+  <canvas id="game" class="game-canvas game-board" width="640" height="420"></canvas>
+  <div class="game-actions"><button class="btn" id="start">▶ Jogar</button></div>
+  <p class="game-message">Mouse, toque ou ↑↓ para mover a raquete.</p>
+</div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const dg = DuduGames;
+  const cv = document.getElementById('game'), ctx = cv.getContext('2d');
+  const scoreEl = document.getElementById('score'), bestEl = document.getElementById('best');
+  const speeds = { easy: 4, normal: 5.2, hard: 6.4 };
+  let best = dg.getRecord('pong'), score = 0, running = false, py = 170, aiY = 170, bx = 320, by = 210, vx = 5, vy = 3;
+  bestEl.textContent = best; dg.installControls({ difficulty: true, onDifficultyChange: () => reset(false) });
+  function reset(start = true) {
+    score = 0; scoreEl.textContent = '0'; py = aiY = 170; bx = 320; by = 210;
+    const s = speeds[dg.getDifficulty()] || speeds.normal; vx = s; vy = s * .55; running = start; if (start) dg.markPlayed('pong');
+  }
+  function draw() {
+    ctx.clearRect(0,0,640,420); ctx.fillStyle = '#0d1526'; ctx.fillRect(0,0,640,420);
+    ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.setLineDash([8,8]); ctx.beginPath(); ctx.moveTo(320,0); ctx.lineTo(320,420); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#4ade80'; ctx.fillRect(24, py, 12, 80); ctx.fillStyle = '#22d3ee'; ctx.fillRect(604, aiY, 12, 80);
+    ctx.fillStyle = '#e6edf3'; ctx.beginPath(); ctx.arc(bx, by, 9, 0, Math.PI*2); ctx.fill();
+  }
+  function step() {
+    if (running) {
+      bx += vx; by += vy; aiY += Math.sign(by - (aiY + 40)) * Math.min(Math.abs(by - (aiY + 40)), 4.2);
+      aiY = Math.max(0, Math.min(340, aiY));
+      if (by < 9 || by > 411) vy *= -1;
+      if (bx < 45 && bx > 24 && by > py && by < py + 80) { vx = Math.abs(vx) + .25; score++; scoreEl.textContent = score; dg.sound('score'); if (score >= 10) dg.unlock('pong-10'); if (dg.setRecord('pong', score)) { best = score; bestEl.textContent = best; } }
+      if (bx > 595 && bx < 616 && by > aiY && by < aiY + 80) vx = -Math.abs(vx);
+      if (bx < -20) { running = false; dg.sound('fail'); }
+      if (bx > 660) vx = -Math.abs(vx);
+    }
+    draw(); requestAnimationFrame(step);
+  }
+  function setPaddle(y) { py = Math.max(0, Math.min(340, y - 40)); }
+  cv.addEventListener('mousemove', e => setPaddle((e.clientY - cv.getBoundingClientRect().top) * cv.height / cv.getBoundingClientRect().height));
+  cv.addEventListener('touchmove', e => { setPaddle((e.touches[0].clientY - cv.getBoundingClientRect().top) * cv.height / cv.getBoundingClientRect().height); e.preventDefault(); }, { passive: false });
+  document.addEventListener('keydown', e => { if (e.key === 'ArrowUp') py -= 22; if (e.key === 'ArrowDown') py += 22; py = Math.max(0, Math.min(340, py)); });
+  document.getElementById('start').addEventListener('click', () => reset(true));
+  window.addEventListener('dudu-reset', () => { best = 0; bestEl.textContent = '0'; });
+  draw(); step();
+})();
+</script>
+</body>
+</html>

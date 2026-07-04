@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16213e">
+<title>🧱 Tetris · DuduGames</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  * { box-sizing: border-box; }
+  body { min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  canvas { width: min(300px, calc(100vw - 32px)); image-rendering: crisp-edges; }
+</style>
+</head>
+<body>
+<div class="game-wrap">
+  <a class="back" href="../">← DuduGames</a>
+  <h1 class="game-title">🧱 Tetris</h1>
+  <div class="by">by DuduGames</div>
+  <div class="game-hud"><span>Pontos: <b id="score">0</b></span><span>Linhas: <b id="lines">0</b></span><span>Recorde: <b id="best">0</b></span></div>
+  <canvas id="game" class="game-canvas game-board" width="300" height="600"></canvas>
+  <div class="game-actions"><button class="btn" id="restart">🔄 Novo jogo</button></div>
+  <div class="game-actions">
+    <button class="btn" data-move="left">←</button>
+    <button class="btn" data-move="rotate">↻</button>
+    <button class="btn" data-move="drop">↓</button>
+    <button class="btn" data-move="right">→</button>
+  </div>
+  <p class="game-message">← → movem · ↑ gira · ↓ acelera</p>
+</div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const dg = DuduGames, cv = document.getElementById('game'), ctx = cv.getContext('2d'), S = 30, W = 10, H = 20;
+  const scoreEl = document.getElementById('score'), linesEl = document.getElementById('lines'), bestEl = document.getElementById('best');
+  const shapes = [[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]],[[1,1,0],[0,1,1]],[[0,1,1],[1,1,0]]];
+  const colors = ['#4ade80','#22d3ee','#a78bfa','#fbbf24','#fb7185','#60a5fa','#f97316'];
+  const drops = { easy: 720, normal: 520, hard: 340 };
+  let grid, piece, px, py, color, score, lines, best = dg.getRecord('tetris'), last = 0, acc = 0, over = false;
+  bestEl.textContent = best; dg.installControls({ difficulty: true, onDifficultyChange: () => reset() });
+  function newPiece() { const i = Math.floor(Math.random()*shapes.length); piece = shapes[i].map(r => [...r]); color = colors[i]; px = 3; py = 0; if (hit(px, py, piece)) { over = true; dg.sound('fail'); } }
+  function reset() { grid = Array.from({length:H}, () => Array(W).fill('')); score = lines = 0; over = false; scoreEl.textContent = linesEl.textContent = '0'; dg.markPlayed('tetris'); newPiece(); }
+  function hit(x,y,p) { return p.some((r,yy) => r.some((v,xx) => v && (x+xx<0 || x+xx>=W || y+yy>=H || grid[y+yy]?.[x+xx]))); }
+  function merge() { piece.forEach((r,yy) => r.forEach((v,xx) => { if (v && grid[py+yy]) grid[py+yy][px+xx] = color; })); }
+  function clearLines() {
+    let cleared = 0; grid = grid.filter(r => r.some(v => !v));
+    cleared = H - grid.length; while (grid.length < H) grid.unshift(Array(W).fill(''));
+    if (cleared) { lines += cleared; score += cleared * 100 * cleared; scoreEl.textContent = score; linesEl.textContent = lines; dg.unlock('tetris-line'); dg.sound('score'); if (dg.setRecord('tetris', score)) { best = score; bestEl.textContent = best; } }
+  }
+  function drop() { if (!hit(px, py+1, piece)) py++; else { merge(); clearLines(); newPiece(); } }
+  function rotate() { const p = piece[0].map((_,i) => piece.map(r => r[i]).reverse()); if (!hit(px,py,p)) piece = p; }
+  function drawBlock(x,y,c) { ctx.fillStyle = c; ctx.fillRect(x*S+2,y*S+2,S-4,S-4); }
+  function draw() {
+    ctx.fillStyle = '#0d1526'; ctx.fillRect(0,0,cv.width,cv.height);
+    grid.forEach((r,y) => r.forEach((c,x) => c && drawBlock(x,y,c)));
+    if (!over) piece.forEach((r,y) => r.forEach((v,x) => v && drawBlock(px+x,py+y,color)));
+    if (over) { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(0,250,300,100); ctx.fillStyle = '#e6edf3'; ctx.font = '700 28px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('Fim de jogo',150,310); }
+  }
+  function loop(ts) { const dt = ts - last; last = ts; if (!over) { acc += dt; if (acc > (drops[dg.getDifficulty()] || drops.normal)) { acc = 0; drop(); } } draw(); requestAnimationFrame(loop); }
+  function move(action) {
+    if (over) return;
+    if (action === 'left' && !hit(px-1,py,piece)) px--;
+    if (action === 'right' && !hit(px+1,py,piece)) px++;
+    if (action === 'drop') drop();
+    if (action === 'rotate') rotate();
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') move('left'); if (e.key === 'ArrowRight') move('right'); if (e.key === 'ArrowDown') move('drop'); if (e.key === 'ArrowUp') move('rotate'); });
+  document.querySelectorAll('[data-move]').forEach(b => b.addEventListener('click', () => move(b.dataset.move)));
+  document.getElementById('restart').addEventListener('click', reset);
+  window.addEventListener('dudu-reset', () => { best = 0; bestEl.textContent = '0'; });
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

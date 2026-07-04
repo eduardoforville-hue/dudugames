@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16213e">
+<title>💣 Campo Minado · DuduGames</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  * { box-sizing: border-box; }
+  body { min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .mine-board { display: grid; gap: 4px; padding: 10px; width: fit-content; }
+  .mine-cell { width: 34px; height: 34px; font-size: 16px; }
+  .mine-cell.open { background: color-mix(in srgb, var(--panel-strong) 86%, var(--accent)); cursor: default; }
+  .mine-cell.flag { color: var(--danger) !important; }
+  @media (max-width: 420px) { .mine-cell { width: 30px; height: 30px; font-size: 14px; } }
+</style>
+</head>
+<body>
+<div class="game-wrap">
+  <a class="back" href="../">← DuduGames</a>
+  <h1 class="game-title">💣 Campo Minado</h1>
+  <div class="by">by DuduGames</div>
+  <div class="game-hud">
+    <span>Tempo: <b id="time">0</b>s</span>
+    <span>Bandeiras: <b id="flags">0</b></span>
+    <span>Recorde: <b id="best">—</b></span>
+  </div>
+  <div id="board" class="game-board mine-board"></div>
+  <div class="game-actions"><button class="btn" id="restart">🔄 Novo campo</button></div>
+  <p class="game-message" id="msg">Clique para abrir. Clique direito ou toque longo para marcar.</p>
+</div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const dg = DuduGames;
+  const levels = { easy: [8,8,8], normal: [9,9,10], hard: [10,10,16] };
+  let [W,H,MINES] = levels[dg.getDifficulty()] || levels.normal;
+  const board = document.getElementById('board');
+  const timeEl = document.getElementById('time');
+  const flagsEl = document.getElementById('flags');
+  const bestEl = document.getElementById('best');
+  const msg = document.getElementById('msg');
+  let cells = [], openCount = 0, flags = 0, seconds = 0, timer = null, over = false, started = false, pressTimer = null;
+  let best = dg.getRecord('mines');
+  bestEl.textContent = best || '—';
+  dg.installControls({ difficulty: true, onDifficultyChange: () => location.reload() });
+
+  function tick() { seconds++; timeEl.textContent = seconds; }
+  function startTimer() { if (!timer) timer = setInterval(tick, 1000); }
+  function stopTimer() { clearInterval(timer); timer = null; }
+  function neighbors(x, y) {
+    const out = [];
+    for (let yy = y - 1; yy <= y + 1; yy++) for (let xx = x - 1; xx <= x + 1; xx++)
+      if ((xx !== x || yy !== y) && xx >= 0 && yy >= 0 && xx < W && yy < H) out.push(cells[yy][xx]);
+    return out;
+  }
+  function reset() {
+    stopTimer(); cells = []; openCount = 0; flags = 0; seconds = 0; over = false; started = false;
+    timeEl.textContent = '0'; flagsEl.textContent = '0'; msg.textContent = 'Clique para abrir. Clique direito ou toque longo para marcar.';
+    board.innerHTML = ''; board.style.gridTemplateColumns = `repeat(${W}, 34px)`;
+    for (let y = 0; y < H; y++) {
+      cells[y] = [];
+      for (let x = 0; x < W; x++) {
+        const el = document.createElement('button');
+        el.className = 'game-cell mine-cell';
+        el.type = 'button';
+        el.addEventListener('click', () => openCell(cells[y][x]));
+        el.addEventListener('contextmenu', e => { e.preventDefault(); flag(cells[y][x]); });
+        el.addEventListener('touchstart', () => { pressTimer = setTimeout(() => flag(cells[y][x]), 450); }, { passive: true });
+        el.addEventListener('touchend', () => clearTimeout(pressTimer));
+        board.appendChild(el);
+        cells[y][x] = { x, y, el, mine: false, open: false, flag: false, n: 0 };
+      }
+    }
+    let placed = 0;
+    while (placed < MINES) {
+      const c = cells[Math.floor(Math.random()*H)][Math.floor(Math.random()*W)];
+      if (!c.mine) { c.mine = true; placed++; }
+    }
+    cells.flat().forEach(c => c.n = neighbors(c.x, c.y).filter(n => n.mine).length);
+  }
+  function flag(c) {
+    if (over || c.open) return;
+    c.flag = !c.flag; flags += c.flag ? 1 : -1;
+    c.el.textContent = c.flag ? '🚩' : ''; c.el.classList.toggle('flag', c.flag);
+    flagsEl.textContent = flags; dg.sound('tick');
+  }
+  function openCell(c) {
+    if (over || c.open || c.flag) return;
+    if (!started) { started = true; startTimer(); dg.markPlayed('mines'); }
+    c.open = true; c.el.classList.add('open'); openCount++; dg.sound('tick');
+    if (c.mine) return lose(c);
+    c.el.textContent = c.n ? c.n : '';
+    if (!c.n) neighbors(c.x, c.y).forEach(openCell);
+    if (openCount === W * H - MINES) win();
+  }
+  function reveal() { cells.flat().forEach(c => { if (c.mine) c.el.textContent = '💣'; }); }
+  function lose(c) { over = true; stopTimer(); c.el.textContent = '💥'; reveal(); msg.textContent = 'Kabum! Tente outro campo.'; dg.sound('fail'); }
+  function win() {
+    over = true; stopTimer(); reveal(); dg.unlock('mines-win'); dg.sound('win');
+    if (dg.setRecord('mines', seconds)) { best = seconds; bestEl.textContent = best; msg.textContent = `Novo recorde: ${seconds}s!`; }
+    else msg.textContent = `Campo limpo em ${seconds}s.`;
+  }
+  document.getElementById('restart').addEventListener('click', reset);
+  window.addEventListener('dudu-reset', () => { best = 0; bestEl.textContent = '—'; });
+  reset();
+})();
+</script>
+</body>
+</html>
