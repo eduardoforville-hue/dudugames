@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16213e">
+<title>🐤 Flappy Dudu · DuduGames</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .stage {
+    position: relative;
+    width: min(420px, calc(100vw - 24px));
+    margin: 0 auto;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,.28), 0 0 0 1px var(--border);
+    touch-action: manipulation;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #0d1526;
+    touch-action: manipulation;
+  }
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+    background: var(--overlay-bg);
+    color: var(--text);
+    text-align: center;
+    transition: opacity .2s, visibility .2s;
+  }
+  #overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  #ov-title {
+    font-size: 28px;
+    font-weight: 800;
+  }
+  #ov-msg {
+    max-width: 310px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  #overlay .btn {
+    min-height: 44px;
+    min-width: 132px;
+    padding: 10px 14px;
+  }
+  .flap-touch {
+    width: min(420px, 100%);
+  }
+  .flap-touch .btn {
+    width: min(220px, 100%);
+    font-weight: 800;
+  }
+  @media (max-width: 420px) {
+    body {
+      padding: 12px;
+      align-items: flex-start;
+    }
+    .game-hud {
+      font-size: 13px;
+    }
+    .stage {
+      width: min(100%, 420px);
+    }
+  }
+</style>
+</head>
+<body>
+<div class="game-wrap">
+  <a class="back" href="../">← DuduGames</a>
+  <h1 class="game-title">🐤 Flappy Dudu</h1>
+  <div class="by">by DuduGames</div>
+  <div class="game-hud">
+    <span>Pontos: <b id="score">0</b></span>
+    <span>Recorde: <b id="best">0</b></span>
+    <span>Combo: <b id="combo">0</b></span>
+  </div>
+  <div class="stage">
+    <canvas id="game" width="420" height="560"></canvas>
+    <div id="overlay">
+      <div id="ov-title">🐤 Flappy Dudu</div>
+      <div id="ov-msg">Toque, clique ou aperte espaço para voar entre os canos.</div>
+      <button class="btn" id="start">▶ Jogar</button>
+    </div>
+  </div>
+  <div class="game-actions flap-touch">
+    <button class="btn" id="flap">↑ Bater asas</button>
+  </div>
+  <p class="game-message" id="msg">Passe pelos canos sem encostar. A dificuldade muda velocidade e abertura.</p>
+</div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const dg = window.DuduGames;
+  const cv = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const comboEl = document.getElementById('combo');
+  const msg = document.getElementById('msg');
+  const overlay = document.getElementById('overlay');
+  const ovTitle = document.getElementById('ov-title');
+  const ovMsg = document.getElementById('ov-msg');
+  const startBtn = document.getElementById('start');
+  const flapBtn = document.getElementById('flap');
+
+  const W = cv.width, H = cv.height;
+  const levels = {
+    easy: { gap: 176, speed: 2.45, gravity: .31, lift: -7.1, spawn: 112 },
+    normal: { gap: 150, speed: 2.85, gravity: .34, lift: -7.35, spawn: 102 },
+    hard: { gap: 126, speed: 3.35, gravity: .38, lift: -7.65, spawn: 92 }
+  };
+
+  let best = dg.getRecord('flappy');
+  let level = levels[dg.getDifficulty()] || levels.normal;
+  let bird, pipes, clouds, score, combo, frame, state, recordThisRun, last = 0;
+  bestEl.textContent = best;
+
+  dg.installControls({ difficulty: true, onDifficultyChange: value => {
+    level = levels[value] || levels.normal;
+    if (state !== 'run') reset('menu');
+  } });
+
+  function makeClouds() {
+    return Array.from({ length: 8 }, (_, i) => ({
+      x: i * 68 + Math.random() * 30,
+      y: 42 + Math.random() * 210,
+      r: 10 + Math.random() * 15,
+      a: .08 + Math.random() * .08
+    }));
+  }
+
+  function reset(nextState = 'menu') {
+    bird = { x: 104, y: H * .45, vy: 0, rot: 0 };
+    pipes = [];
+    clouds = makeClouds();
+    score = 0;
+    combo = 0;
+    frame = 0;
+    recordThisRun = false;
+    scoreEl.textContent = '0';
+    comboEl.textContent = '0';
+    msg.textContent = 'Passe pelos canos sem encostar. A dificuldade muda velocidade e abertura.';
+    state = nextState;
+    if (state === 'menu') showOverlay('🐤 Flappy Dudu', 'Toque, clique ou aperte espaço para voar entre os canos.', '▶ Jogar');
+  }
+
+  function showOverlay(title, text, buttonText) {
+    ovTitle.textContent = title;
+    ovMsg.textContent = text;
+    startBtn.textContent = buttonText;
+    overlay.classList.remove('hidden');
+    startBtn.disabled = false;
+  }
+
+  function hideOverlay() {
+    overlay.classList.add('hidden');
+    startBtn.disabled = true;
+  }
+
+  function start() {
+    reset('run');
+    hideOverlay();
+    dg.markPlayed('flappy');
+    flap();
+  }
+
+  function flap() {
+    if (state === 'menu' || state === 'over') return start();
+    if (state !== 'run') return;
+    bird.vy = level.lift;
+    dg.sound('tick');
+  }
+
+  function spawnPipe() {
+    const margin = 74;
+    const top = margin + Math.random() * (H - 220 - level.gap);
+    pipes.push({ x: W + 20, top, bottom: top + level.gap, passed: false });
+  }
+
+  function hitPipe(pipe) {
+    const bx = bird.x, by = bird.y, r = 15;
+    const inX = bx + r > pipe.x && bx - r < pipe.x + 62;
+    const inGap = by - r > pipe.top && by + r < pipe.bottom;
+    return inX && !inGap;
+  }
+
+  function update() {
+    if (state !== 'run') return;
+    frame++;
+    bird.vy += level.gravity;
+    bird.y += bird.vy;
+    bird.rot = Math.max(-.55, Math.min(.9, bird.vy / 10));
+
+    if (frame % level.spawn === 1) spawnPipe();
+    pipes.forEach(pipe => {
+      pipe.x -= level.speed;
+      if (!pipe.passed && pipe.x + 62 < bird.x) {
+        pipe.passed = true;
+        score++;
+        combo++;
+        scoreEl.textContent = score;
+        comboEl.textContent = combo;
+        dg.sound('score');
+        if (score >= 10) dg.unlock('flappy-10');
+        if (score >= 25) dg.unlock('flappy-25');
+        if (dg.setRecord('flappy', score)) {
+          recordThisRun = true;
+          best = score;
+          bestEl.textContent = best;
+        }
+      }
+    });
+    pipes = pipes.filter(pipe => pipe.x > -90);
+    clouds.forEach(cloud => {
+      cloud.x -= level.speed * .22;
+      if (cloud.x < -40) {
+        cloud.x = W + 40;
+        cloud.y = 42 + Math.random() * 210;
+      }
+    });
+
+    if (bird.y < 18 || bird.y > H - 76 || pipes.some(hitPipe)) gameOver();
+  }
+
+  function gameOver() {
+    state = 'over';
+    combo = 0;
+    comboEl.textContent = '0';
+    dg.sound('fail');
+    const recordText = recordThisRun ? 'Novo recorde!' : 'Recorde: ' + best + '.';
+    msg.textContent = 'Fim de voo. ' + recordText;
+    showOverlay('Fim de voo', 'Você fez ' + score + ' ponto' + (score === 1 ? '' : 's') + '. ' + recordText, '↻ Tentar de novo');
+  }
+
+  function drawBackground(t) {
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#12264a');
+    sky.addColorStop(.55, '#0d1b34');
+    sky.addColorStop(1, '#0a0f1e');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    clouds.forEach(cloud => {
+      ctx.globalAlpha = cloud.a * (1 + .2 * Math.sin(t / 700 + cloud.x));
+      ctx.fillStyle = '#e6edf3';
+      ctx.beginPath();
+      ctx.arc(cloud.x, cloud.y, cloud.r, 0, Math.PI * 2);
+      ctx.arc(cloud.x + cloud.r * .9, cloud.y + 3, cloud.r * .75, 0, Math.PI * 2);
+      ctx.arc(cloud.x - cloud.r * .8, cloud.y + 4, cloud.r * .65, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = 'rgba(74,222,128,.12)';
+    for (let x = -((frame * level.speed) % 36); x < W; x += 36) {
+      ctx.fillRect(x, H - 58, 20, 4);
+    }
+    ctx.fillStyle = '#10253d';
+    ctx.fillRect(0, H - 54, W, 54);
+    ctx.fillStyle = 'rgba(74,222,128,.45)';
+    ctx.fillRect(0, H - 54, W, 4);
+  }
+
+  function drawPipe(pipe) {
+    const width = 62;
+    const grad = ctx.createLinearGradient(pipe.x, 0, pipe.x + width, 0);
+    grad.addColorStop(0, '#16a34a');
+    grad.addColorStop(.5, '#4ade80');
+    grad.addColorStop(1, '#15803d');
+    ctx.fillStyle = grad;
+    ctx.fillRect(pipe.x, 0, width, pipe.top);
+    ctx.fillRect(pipe.x, pipe.bottom, width, H - 54 - pipe.bottom);
+    ctx.fillStyle = '#86efac';
+    ctx.fillRect(pipe.x - 6, pipe.top - 18, width + 12, 18);
+    ctx.fillRect(pipe.x - 6, pipe.bottom, width + 12, 18);
+    ctx.fillStyle = 'rgba(255,255,255,.18)';
+    ctx.fillRect(pipe.x + 10, 0, 8, pipe.top - 22);
+    ctx.fillRect(pipe.x + 10, pipe.bottom + 22, 8, H - pipe.bottom - 82);
+  }
+
+  function drawBird(t) {
+    ctx.save();
+    ctx.translate(bird.x, bird.y);
+    ctx.rotate(bird.rot);
+    const wing = Math.sin(t / 80) * 5;
+    ctx.shadowColor = '#fbbf24';
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 17, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fde68a';
+    ctx.beginPath();
+    ctx.ellipse(-5, 5, 10, 7 + wing * .12, -.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fb923c';
+    ctx.beginPath();
+    ctx.moveTo(15, -2);
+    ctx.lineTo(29, 3);
+    ctx.lineTo(15, 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.arc(7, -5, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function draw(t = 0) {
+    drawBackground(t);
+    pipes.forEach(drawPipe);
+    drawBird(t);
+    if (state === 'menu') {
+      ctx.fillStyle = 'rgba(230,237,243,.72)';
+      ctx.font = '700 18px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Toque para começar', W / 2, H * .68);
+    }
+  }
+
+  function loop(t) {
+    const dt = t - last;
+    last = t;
+    if (dt < 80) update();
+    draw(t);
+    requestAnimationFrame(loop);
+  }
+
+  startBtn.addEventListener('click', start);
+  flapBtn.addEventListener('click', flap);
+  cv.addEventListener('pointerdown', event => { event.preventDefault(); flap(); });
+  document.addEventListener('keydown', event => {
+    if (event.code === 'Space' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      flap();
+    }
+  });
+  window.addEventListener('dudu-reset', () => {
+    best = 0;
+    bestEl.textContent = '0';
+  });
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

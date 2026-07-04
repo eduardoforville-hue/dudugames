@@ -19,7 +19,8 @@
     forca: { label: 'Forca', key: 'dudu-forca-recorde', unit: 'vitórias', better: 'higher' },
     sudoku: { label: 'Sudoku', key: 'dudu-sudoku-recorde', unit: 's', better: 'lower' },
     invaders: { label: 'Invaders', key: 'dudu-invaders-recorde', unit: 'pts', better: 'higher' },
-    golfe: { label: 'Golfe Cósmico', key: 'dudu-golfe-recorde', unit: 'tacadas', better: 'lower' }
+    golfe: { label: 'Golfe Cósmico', key: 'dudu-golfe-recorde', unit: 'tacadas', better: 'lower' },
+    flappy: { label: 'Flappy Dudu', key: 'dudu-flappy-recorde', unit: 'pts', better: 'higher' }
   };
 
   const achievements = [
@@ -37,6 +38,8 @@
     { id: 'invaders-100', title: 'Defensor arcade', desc: 'Fez 100 pontos em Space Invaders.' },
     { id: 'golfe-estrela', title: 'Colecionador estelar', desc: 'Pegou uma estrela bônus no Golfe Cósmico.' },
     { id: 'golfe-par', title: 'Tacada de outro planeta', desc: 'Terminou o campo do Golfe Cósmico no par ou abaixo.' },
+    { id: 'flappy-10', title: 'Asinhas firmes', desc: 'Fez 10 pontos no Flappy Dudu.' },
+    { id: 'flappy-25', title: 'Voo longo', desc: 'Fez 25 pontos no Flappy Dudu.' },
     { id: 'all-games', title: 'Tour completo', desc: 'Jogou todos os jogos.' }
   ];
 

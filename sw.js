@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dudugames-v11';
+const CACHE_NAME = 'dudugames-v12';
 const ASSETS = [
   './',
   './index.html',
@@ -31,7 +31,9 @@ const ASSETS = [
   './space-invaders/',
   './space-invaders/index.html',
   './golfe/',
-  './golfe/index.html'
+  './golfe/index.html',
+  './flappy/',
+  './flappy/index.html'
 ];
 
 self.addEventListener('install', event => {
