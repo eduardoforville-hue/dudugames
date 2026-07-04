@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔢 2048 · DuduGames</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at top, #16213e 0%, #0a0f1e 70%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #e6edf3;
+    padding: 16px;
+  }
+  .wrap { text-align: center; }
+  .back {
+    display: inline-block;
+    margin-bottom: 10px;
+    color: #64748b;
+    text-decoration: none;
+    font-size: 14px;
+  }
+  .back:hover { color: #4ade80; }
+  h1 {
+    font-size: 28px;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, #4ade80, #22d3ee);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    width: 362px;
+    margin: 0 auto 12px;
+    font-size: 14px;
+    color: #9fb0c3;
+  }
+  .hud b { color: #4ade80; font-size: 17px; }
+  .stage { position: relative; display: inline-block; }
+  #board {
+    position: relative;
+    width: 362px;
+    height: 362px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    touch-action: none;
+  }
+  .bgcell {
+    position: absolute;
+    width: 78px;
+    height: 78px;
+    border-radius: 8px;
+    background: rgba(255,255,255,.04);
+  }
+  .tile {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 78px;
+    height: 78px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    transition: transform .12s ease;
+    z-index: 2;
+  }
+  .tile.pop { animation: pop .18s ease; }
+  @keyframes pop { 0% { scale: .4; } 70% { scale: 1.12; } 100% { scale: 1; } }
+  #overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 15, 30, .85);
+    backdrop-filter: blur(3px);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    z-index: 5;
+    transition: opacity .25s;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  #ov-title { font-size: 28px; font-weight: 700; }
+  #ov-msg { font-size: 15px; color: #9fb0c3; max-width: 280px; line-height: 1.6; }
+  .btn {
+    padding: 10px 22px;
+    font-size: 15px;
+    border: 1px solid rgba(74, 222, 128, .45);
+    border-radius: 10px;
+    background: rgba(74, 222, 128, .2);
+    color: #4ade80;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .btn:hover { background: rgba(74, 222, 128, .35); }
+  #overlay .btn { margin-top: 12px; }
+  .actions { margin-top: 14px; }
+  .hint { margin-top: 12px; font-size: 13px; color: #64748b; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="../">← DuduGames</a>
+  <h1>🔢 2048</h1>
+  <div class="hud">
+    <span>Pontos: <b id="score">0</b></span>
+    <span>Recorde: <b id="best">0</b></span>
+  </div>
+  <div class="stage">
+    <div id="board"></div>
+    <div id="overlay" class="hidden">
+      <div id="ov-title"></div>
+      <div id="ov-msg"></div>
+      <button class="btn" id="ov-btn">Jogar de novo</button>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn" id="restart">🔄 Novo jogo</button>
+  </div>
+  <p class="hint">Setas ou WASD · No celular, deslize o dedo</p>
+</div>
+<script>
+(() => {
+  const SIZE = 4, CELL = 78, GAP = 10;
+  const HS_KEY = 'dudu-2048-recorde';
+  const storage = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} }
+  };
+
+  const board = document.getElementById('board');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const overlay = document.getElementById('overlay');
+  const ovTitle = document.getElementById('ov-title');
+  const ovMsg = document.getElementById('ov-msg');
+  const ovBtn = document.getElementById('ov-btn');
+
+  const COLORS = {
+    2:    ['#3a4a6b', '#cdd7e8'], 4:    ['#42598a', '#d8e2f2'],
+    8:    ['#f2b179', '#4a2c12'], 16:   ['#f59563', '#4a2410'],
+    32:   ['#f67c5f', '#47180c'], 64:   ['#f65e3b', '#41130a'],
+    128:  ['#edcf72', '#4b3a08'], 256:  ['#edcc61', '#4b3a08'],
+    512:  ['#edc850', '#4b3a08'], 1024: ['#edc53f', '#4b3a08'],
+    2048: ['#edc22e', '#4b3a08']
+  };
+
+  let tiles = [], nextId = 1, score = 0, lock = false, over = false, won = false;
+  let best = +storage.get(HS_KEY) || 0;
+  bestEl.textContent = best;
+
+  for (let x = 0; x < SIZE; x++)
+    for (let y = 0; y < SIZE; y++) {
+      const c = document.createElement('div');
+      c.className = 'bgcell';
+      c.style.transform = pos(x, y);
+      board.appendChild(c);
+    }
+
+  function pos(x, y) {
+    return 'translate(' + (GAP + x * (CELL + GAP)) + 'px,' + (GAP + y * (CELL + GAP)) + 'px)';
+  }
+
+  function tileAt(x, y) {
+    return tiles.find(t => t.x === x && t.y === y);
+  }
+
+  function paint(t) {
+    const [bg, fg] = COLORS[Math.min(t.v, 2048)] || ['#22d3ee', '#083344'];
+    t.el.style.background = bg;
+    t.el.style.color = fg;
+    t.el.style.fontSize = t.v < 100 ? '32px' : t.v < 1000 ? '26px' : '21px';
+    t.el.textContent = t.v;
+  }
+
+  function spawn() {
+    const empty = [];
+    for (let x = 0; x < SIZE; x++)
+      for (let y = 0; y < SIZE; y++)
+        if (!tileAt(x, y)) empty.push({ x, y });
+    if (!empty.length) return;
+    const { x, y } = empty[Math.floor(Math.random() * empty.length)];
+    const t = { id: nextId++, x, y, v: Math.random() < 0.9 ? 2 : 4 };
+    t.el = document.createElement('div');
+    t.el.className = 'tile pop';
+    t.el.style.transform = pos(x, y);
+    paint(t);
+    board.appendChild(t.el);
+    tiles.push(t);
+  }
+
+  function addScore(n) {
+    score += n;
+    scoreEl.textContent = score;
+    if (score > best) {
+      best = score;
+      bestEl.textContent = best;
+      storage.set(HS_KEY, best);
+    }
+  }
+
+  function canMove() {
+    if (tiles.length < SIZE * SIZE) return true;
+    for (const t of tiles) {
+      const right = tileAt(t.x + 1, t.y);
+      const down = tileAt(t.x, t.y + 1);
+      if ((right && right.v === t.v) || (down && down.v === t.v)) return true;
+    }
+    return false;
+  }
+
+  function move(dx, dy) {
+    if (lock || over) return;
+    const merges = [];
+    let movedAny = false;
+
+    for (let i = 0; i < SIZE; i++) {
+      const line = tiles.filter(t => (dy === 0 ? t.y === i : t.x === i));
+      line.sort((a, b) => {
+        const av = dy === 0 ? a.x : a.y, bv = dy === 0 ? b.x : b.y;
+        return (dx === 1 || dy === 1) ? bv - av : av - bv;
+      });
+      let slot = 0, last = null;
+      for (const t of line) {
+        if (last && last.v === t.v) {
+          t.tx = last.tx; t.ty = last.ty;
+          merges.push({ winner: last, loser: t });
+          last = null;
+        } else {
+          const p = (dx === 1 || dy === 1) ? SIZE - 1 - slot : slot;
+          t.tx = dy === 0 ? p : i;
+          t.ty = dy === 0 ? i : p;
+          last = t;
+          slot++;
+        }
+      }
+    }
+
+    for (const t of tiles) {
+      if (t.tx !== t.x || t.ty !== t.y) movedAny = true;
+      t.x = t.tx; t.y = t.ty;
+      t.el.style.transform = pos(t.x, t.y);
+      t.el.classList.remove('pop');
+    }
+    if (!movedAny) return;
+
+    lock = true;
+    setTimeout(() => {
+      for (const m of merges) {
+        m.loser.el.remove();
+        tiles = tiles.filter(t => t !== m.loser);
+        m.winner.v *= 2;
+        paint(m.winner);
+        m.winner.el.classList.add('pop');
+        addScore(m.winner.v);
+        if (m.winner.v === 2048 && !won) {
+          won = true;
+          ovTitle.textContent = '🏆 2048!';
+          ovMsg.textContent = 'Você chegou lá com ' + score + ' pontos! Pode continuar jogando para ir além.';
+          ovBtn.textContent = 'Continuar';
+          ovBtn.onclick = () => overlay.classList.add('hidden');
+          overlay.classList.remove('hidden');
+        }
+      }
+      spawn();
+      if (!canMove()) {
+        over = true;
+        ovTitle.textContent = '💀 Fim de jogo!';
+        ovMsg.textContent = 'Você fez ' + score + ' pontos.' + (score >= best && score > 0 ? ' 🏆 Recorde!' : ' Seu recorde é ' + best + '.');
+        ovBtn.textContent = 'Jogar de novo';
+        ovBtn.onclick = reset;
+        overlay.classList.remove('hidden');
+      }
+      lock = false;
+    }, 130);
+  }
+
+  function reset() {
+    tiles.forEach(t => t.el.remove());
+    tiles = [];
+    score = 0; over = false; won = false; lock = false;
+    scoreEl.textContent = '0';
+    overlay.classList.add('hidden');
+    spawn();
+    spawn();
+  }
+
+  document.addEventListener('keydown', e => {
+    const map = {
+      ArrowUp: [0,-1], w: [0,-1], W: [0,-1],
+      ArrowDown: [0,1], s: [0,1], S: [0,1],
+      ArrowLeft: [-1,0], a: [-1,0], A: [-1,0],
+      ArrowRight: [1,0], d: [1,0], D: [1,0]
+    };
+    if (map[e.key]) {
+      e.preventDefault();
+      move(...map[e.key]);
+    }
+  });
+
+  let tx = null, ty = null;
+  board.addEventListener('touchstart', e => {
+    tx = e.touches[0].clientX;
+    ty = e.touches[0].clientY;
+  }, { passive: true });
+  board.addEventListener('touchend', e => {
+    if (tx === null) return;
+    const dx = e.changedTouches[0].clientX - tx;
+    const dy = e.changedTouches[0].clientY - ty;
+    if (Math.abs(dx) > 24 || Math.abs(dy) > 24) {
+      if (Math.abs(dx) > Math.abs(dy)) move(Math.sign(dx), 0);
+      else move(0, Math.sign(dy));
+    }
+    tx = ty = null;
+  }, { passive: true });
+
+  document.getElementById('restart').addEventListener('click', reset);
+  ovBtn.onclick = reset;
+  reset();
+})();
+</script>
+</body>
+</html>

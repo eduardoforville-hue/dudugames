@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎮 DuduGames</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(ellipse at top, #16213e 0%, #0a0f1e 70%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #e6edf3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 20px 32px;
+  }
+  h1 {
+    font-size: 44px;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, #4ade80, #22d3ee, #a78bfa);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .tagline { color: #9fb0c3; margin: 10px 0 36px; font-size: 16px; text-align: center; }
+  .games {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    width: 100%;
+    max-width: 780px;
+  }
+  a.card, .card {
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 16px;
+    padding: 28px 20px 24px;
+    text-decoration: none;
+    color: inherit;
+    text-align: center;
+    transition: transform .15s, background .15s, border-color .15s;
+  }
+  a.card:hover {
+    transform: translateY(-4px);
+    background: rgba(255,255,255,.09);
+    border-color: rgba(74, 222, 128, .4);
+  }
+  .emoji { font-size: 54px; line-height: 1; }
+  .card h2 { margin: 14px 0 8px; font-size: 20px; }
+  .card p { font-size: 14px; color: #9fb0c3; line-height: 1.5; }
+  .soon { opacity: .5; border-style: dashed; }
+  footer { margin-top: 44px; color: #64748b; font-size: 13px; text-align: center; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <h1>🎮 DuduGames</h1>
+  <p class="tagline">Joguinhos do Dudu para passar o tempo. Escolha o seu:</p>
+  <div class="games">
+    <a class="card" href="cobrinha/">
+      <div class="emoji">🐍</div>
+      <h2>Cobrinha</h2>
+      <p>O clássico: coma maçãs, cresça e não bata na parede. Vai ficando mais rápido!</p>
+    </a>
+    <a class="card" href="memoria/">
+      <div class="emoji">🧠</div>
+      <h2>Jogo da Memória</h2>
+      <p>Encontre os pares de emojis no menor número de jogadas possível.</p>
+    </a>
+    <a class="card" href="2048/">
+      <div class="emoji">🔢</div>
+      <h2>2048</h2>
+      <p>Deslize e junte os números iguais até chegar no lendário 2048.</p>
+    </a>
+    <div class="card soon">
+      <div class="emoji">🎁</div>
+      <h2>Em breve...</h2>
+      <p>A série DuduGames está só começando. Volte sempre!</p>
+    </div>
+  </div>
+  <footer>Feito pelo Dudu, com uma ajudinha do Claude 🤖<br>Seus recordes ficam salvos aqui no seu navegador.</footer>
+</body>
+</html>

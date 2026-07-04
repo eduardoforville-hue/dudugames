@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐍 Cobrinha · DuduGames</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at top, #16213e 0%, #0a0f1e 70%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #e6edf3;
+    padding: 16px;
+  }
+  .wrap { text-align: center; }
+  .back {
+    display: inline-block;
+    margin-bottom: 10px;
+    color: #64748b;
+    text-decoration: none;
+    font-size: 14px;
+  }
+  .back:hover { color: #4ade80; }
+  h1 {
+    font-size: 28px;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, #4ade80, #22d3ee);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    max-width: 420px;
+    margin: 0 auto 10px;
+    font-size: 15px;
+    color: #9fb0c3;
+  }
+  .hud b { color: #4ade80; font-size: 18px; display: inline-block; }
+  .hud b.pop { animation: pop .25s ease; }
+  @keyframes pop { 50% { transform: scale(1.5); } }
+  .stage {
+    position: relative;
+    display: inline-block;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06);
+  }
+  canvas { display: block; max-width: 100%; height: auto; }
+  #overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 15, 30, .82);
+    backdrop-filter: blur(3px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: opacity .2s;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  #ov-title { font-size: 30px; font-weight: 700; }
+  #ov-msg { font-size: 15px; color: #9fb0c3; max-width: 300px; line-height: 1.5; }
+  .hint { margin-top: 12px; font-size: 13px; color: #64748b; }
+  .dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 56px);
+    grid-template-rows: repeat(2, 48px);
+    gap: 6px;
+    justify-content: center;
+    margin-top: 14px;
+  }
+  .dpad button {
+    font-size: 20px;
+    border: none;
+    border-radius: 10px;
+    background: rgba(255,255,255,.08);
+    color: #e6edf3;
+    cursor: pointer;
+    transition: background .15s;
+    touch-action: manipulation;
+  }
+  .dpad button:active { background: rgba(74, 222, 128, .35); }
+  .dpad .up    { grid-column: 2; grid-row: 1; }
+  .dpad .left  { grid-column: 1; grid-row: 2; }
+  .dpad .down  { grid-column: 2; grid-row: 2; }
+  .dpad .right { grid-column: 3; grid-row: 2; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="../">← DuduGames</a>
+  <h1>🐍 Cobrinha</h1>
+  <div class="hud">
+    <span>Pontos: <b id="score">0</b></span>
+    <span>Recorde: <b id="high">0</b></span>
+  </div>
+  <div class="stage">
+    <canvas id="game" width="420" height="420"></canvas>
+    <div id="overlay">
+      <div id="ov-title">🐍 Cobrinha</div>
+      <div id="ov-msg">Aperte espaço ou toque aqui para começar</div>
+    </div>
+  </div>
+  <div class="dpad">
+    <button class="up" data-dir="0,-1">▲</button>
+    <button class="left" data-dir="-1,0">◀</button>
+    <button class="down" data-dir="0,1">▼</button>
+    <button class="right" data-dir="1,0">▶</button>
+  </div>
+  <p class="hint">Setas ou WASD para mover · Espaço pausa</p>
+</div>
+<script>
+(() => {
+  const cv = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  const N = 21;
+  const CELL = cv.width / N;
+  const HS_KEY = 'cobrinha-recorde';
+
+  const scoreEl = document.getElementById('score');
+  const highEl = document.getElementById('high');
+  const overlay = document.getElementById('overlay');
+  const ovTitle = document.getElementById('ov-title');
+  const ovMsg = document.getElementById('ov-msg');
+
+  const storage = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} }
+  };
+
+  let snake, dir, nextDir, food, score, stepMs;
+  let state = 'menu'; // menu | run | pause | over
+  let best = +storage.get(HS_KEY) || 0;
+  let last = 0, acc = 0, now = 0;
+  highEl.textContent = best;
+
+  function reset() {
+    snake = [{x:10,y:10},{x:9,y:10},{x:8,y:10}];
+    dir = {x:1,y:0};
+    nextDir = {x:1,y:0};
+    score = 0;
+    stepMs = 150;
+    acc = 0;
+    scoreEl.textContent = '0';
+    placeFood();
+  }
+
+  function placeFood() {
+    do {
+      food = { x: Math.floor(Math.random()*N), y: Math.floor(Math.random()*N) };
+    } while (snake.some(s => s.x === food.x && s.y === food.y));
+  }
+
+  function start() {
+    reset();
+    state = 'run';
+    overlay.classList.add('hidden');
+  }
+
+  function togglePause() {
+    if (state === 'run') {
+      state = 'pause';
+      show('⏸️ Pausado', 'Espaço ou toque para continuar');
+    } else if (state === 'pause') {
+      state = 'run';
+      overlay.classList.add('hidden');
+    }
+  }
+
+  function gameOver() {
+    state = 'over';
+    const record = score > best;
+    if (record) {
+      best = score;
+      storage.set(HS_KEY, best);
+      highEl.textContent = best;
+    }
+    show('💀 Fim de jogo!', record
+      ? `🏆 Novo recorde: ${score} pontos! Espaço para jogar de novo.`
+      : `Você fez ${score} pontos. Espaço para tentar de novo.`);
+  }
+
+  function show(title, msg) {
+    ovTitle.textContent = title;
+    ovMsg.textContent = msg;
+    overlay.classList.remove('hidden');
+  }
+
+  function step() {
+    dir = nextDir;
+    const h = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+    if (h.x < 0 || h.y < 0 || h.x >= N || h.y >= N ||
+        snake.some(s => s.x === h.x && s.y === h.y)) {
+      gameOver();
+      return;
+    }
+    snake.unshift(h);
+    if (h.x === food.x && h.y === food.y) {
+      score += 10;
+      scoreEl.textContent = score;
+      scoreEl.classList.remove('pop');
+      void scoreEl.offsetWidth;
+      scoreEl.classList.add('pop');
+      if (stepMs > 70) stepMs -= 3;
+      placeFood();
+    } else {
+      snake.pop();
+    }
+  }
+
+  function cell(x, y, r, color, glow) {
+    ctx.save();
+    if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 14; }
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x*CELL+1.5, y*CELL+1.5, CELL-3, CELL-3, r);
+    else ctx.rect(x*CELL+1.5, y*CELL+1.5, CELL-3, CELL-3);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function draw() {
+    // tabuleiro
+    ctx.fillStyle = '#0d1526';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = 'rgba(255,255,255,.022)';
+    for (let x = 0; x < N; x++)
+      for (let y = 0; y < N; y++)
+        if ((x + y) % 2 === 0) ctx.fillRect(x*CELL, y*CELL, CELL, CELL);
+
+    if (!snake) return;
+
+    // comida pulsante
+    const pulse = 0.72 + 0.14 * Math.sin(now / 170);
+    ctx.save();
+    ctx.shadowColor = '#f87171';
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(food.x*CELL + CELL/2, food.y*CELL + CELL/2, CELL/2 * pulse, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    // folhinha da maçã
+    ctx.fillStyle = '#4ade80';
+    ctx.beginPath();
+    ctx.ellipse(food.x*CELL + CELL/2 + 3, food.y*CELL + CELL/2 - CELL/2*pulse - 1, 3.4, 1.9, -0.6, 0, Math.PI*2);
+    ctx.fill();
+
+    // cobra
+    for (let i = snake.length - 1; i >= 0; i--) {
+      const s = snake[i];
+      if (i === 0) {
+        cell(s.x, s.y, 7, '#86efac', '#4ade80');
+        // olhinhos
+        ctx.fillStyle = '#0d1526';
+        const cx = s.x*CELL + CELL/2, cy = s.y*CELL + CELL/2;
+        const ox = dir.y !== 0 ? 4.2 : 0, oy = dir.x !== 0 ? 4.2 : 0;
+        const fx = dir.x * 3.2, fy = dir.y * 3.2;
+        ctx.beginPath();
+        ctx.arc(cx + fx + ox, cy + fy + oy, 1.9, 0, Math.PI*2);
+        ctx.arc(cx + fx - ox, cy + fy - oy, 1.9, 0, Math.PI*2);
+        ctx.fill();
+      } else {
+        const fade = Math.min(i * 1.1, 22);
+        cell(s.x, s.y, 5, `hsl(${142 + i*1.5}, 62%, ${50 - fade}%)`);
+      }
+    }
+  }
+
+  function loop(ts) {
+    const dt = Math.min(ts - last, 100);
+    last = ts;
+    now = ts;
+    if (state === 'run') {
+      acc += dt;
+      while (acc >= stepMs) {
+        acc -= stepMs;
+        step();
+        if (state !== 'run') break;
+      }
+    }
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function setDir(x, y) {
+    if (state !== 'run') return;
+    if (x === -dir.x && y === -dir.y) return;
+    nextDir = { x, y };
+  }
+
+  function action() {
+    if (state === 'menu' || state === 'over') start();
+    else togglePause();
+  }
+
+  document.addEventListener('keydown', e => {
+    const map = {
+      ArrowUp:[0,-1], w:[0,-1], W:[0,-1],
+      ArrowDown:[0,1], s:[0,1], S:[0,1],
+      ArrowLeft:[-1,0], a:[-1,0], A:[-1,0],
+      ArrowRight:[1,0], d:[1,0], D:[1,0]
+    };
+    if (map[e.key]) {
+      e.preventDefault();
+      setDir(...map[e.key]);
+    } else if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      action();
+    }
+  });
+
+  overlay.addEventListener('click', action);
+
+  document.querySelectorAll('.dpad button').forEach(b => {
+    const [x, y] = b.dataset.dir.split(',').map(Number);
+    b.addEventListener('click', () => {
+      if (state === 'menu' || state === 'over' || state === 'pause') action();
+      setDir(x, y);
+    });
+  });
+
+  // swipe no canvas (celular)
+  let tx = null, ty = null;
+  cv.addEventListener('touchstart', e => {
+    tx = e.touches[0].clientX;
+    ty = e.touches[0].clientY;
+  }, { passive: true });
+  cv.addEventListener('touchend', e => {
+    if (tx === null) return;
+    const dx = e.changedTouches[0].clientX - tx;
+    const dy = e.changedTouches[0].clientY - ty;
+    if (Math.abs(dx) > 24 || Math.abs(dy) > 24) {
+      if (Math.abs(dx) > Math.abs(dy)) setDir(Math.sign(dx), 0);
+      else setDir(0, Math.sign(dy));
+    }
+    tx = ty = null;
+  }, { passive: true });
+
+  draw();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

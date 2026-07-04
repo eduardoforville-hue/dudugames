@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧠 Jogo da Memória · DuduGames</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at top, #16213e 0%, #0a0f1e 70%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #e6edf3;
+    padding: 16px;
+  }
+  .wrap { text-align: center; }
+  .back {
+    display: inline-block;
+    margin-bottom: 10px;
+    color: #64748b;
+    text-decoration: none;
+    font-size: 14px;
+  }
+  .back:hover { color: #4ade80; }
+  h1 {
+    font-size: 28px;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, #4ade80, #22d3ee);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    max-width: 356px;
+    margin: 0 auto 12px;
+    font-size: 14px;
+    color: #9fb0c3;
+  }
+  .hud b { color: #4ade80; font-size: 16px; }
+  .stage { position: relative; display: inline-block; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 80px);
+    grid-template-rows: repeat(4, 80px);
+    gap: 10px;
+  }
+  .card {
+    perspective: 500px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+  }
+  .inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform .35s;
+  }
+  .card.open .inner, .card.matched .inner { transform: rotateY(180deg); }
+  .face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .front {
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.1);
+    color: #4ade80;
+    font-size: 24px;
+  }
+  .card:hover .front { background: rgba(255,255,255,.12); }
+  .backface {
+    background: rgba(74, 222, 128, .14);
+    border: 1px solid rgba(74, 222, 128, .3);
+    transform: rotateY(180deg);
+    font-size: 38px;
+  }
+  .card.matched .backface {
+    background: rgba(74, 222, 128, .3);
+    box-shadow: 0 0 14px rgba(74, 222, 128, .35);
+  }
+  #overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 15, 30, .85);
+    backdrop-filter: blur(3px);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: opacity .25s;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  #ov-title { font-size: 28px; font-weight: 700; }
+  #ov-msg { font-size: 15px; color: #9fb0c3; max-width: 280px; line-height: 1.6; }
+  .btn {
+    margin-top: 14px;
+    padding: 10px 22px;
+    font-size: 15px;
+    border: none;
+    border-radius: 10px;
+    background: rgba(74, 222, 128, .2);
+    border: 1px solid rgba(74, 222, 128, .45);
+    color: #4ade80;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .btn:hover { background: rgba(74, 222, 128, .35); }
+  .actions { margin-top: 14px; }
+  .actions .btn { margin-top: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="../">← DuduGames</a>
+  <h1>🧠 Jogo da Memória</h1>
+  <div class="hud">
+    <span>Jogadas: <b id="moves">0</b></span>
+    <span>Tempo: <b id="time">0:00</b></span>
+    <span>Recorde: <b id="best">—</b></span>
+  </div>
+  <div class="stage">
+    <div class="grid" id="grid"></div>
+    <div id="overlay" class="hidden">
+      <div id="ov-title"></div>
+      <div id="ov-msg"></div>
+      <button class="btn" id="ov-btn">Jogar de novo</button>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn" id="restart">🔄 Reiniciar</button>
+  </div>
+</div>
+<script>
+(() => {
+  const EMOJIS = ['🐍','🍎','🚀','🌵','🦖','🍕','⚽','🎲','🐙','🌈','🍩','🎸','🐬','🌋','🛸','🍿'];
+  const HS_KEY = 'dudu-memoria-recorde';
+  const storage = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} }
+  };
+
+  const grid = document.getElementById('grid');
+  const movesEl = document.getElementById('moves');
+  const timeEl = document.getElementById('time');
+  const bestEl = document.getElementById('best');
+  const overlay = document.getElementById('overlay');
+  const ovTitle = document.getElementById('ov-title');
+  const ovMsg = document.getElementById('ov-msg');
+
+  let first = null, lock = false, moves = 0, matched = 0;
+  let seconds = 0, timer = null;
+  let best = +storage.get(HS_KEY) || 0;
+  if (best) bestEl.textContent = best;
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function fmt(s) {
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+
+  function startTimer() {
+    if (timer) return;
+    timer = setInterval(() => {
+      seconds++;
+      timeEl.textContent = fmt(seconds);
+    }, 1000);
+  }
+
+  function stopTimer() {
+    clearInterval(timer);
+    timer = null;
+  }
+
+  function deal() {
+    stopTimer();
+    first = null; lock = false; moves = 0; matched = 0; seconds = 0;
+    movesEl.textContent = '0';
+    timeEl.textContent = '0:00';
+    overlay.classList.add('hidden');
+    grid.innerHTML = '';
+    const pool = shuffle([...EMOJIS]).slice(0, 8);
+    const cards = shuffle([...pool, ...pool]);
+    cards.forEach(emoji => {
+      const btn = document.createElement('button');
+      btn.className = 'card';
+      btn.dataset.emoji = emoji;
+      btn.setAttribute('aria-label', 'carta');
+      btn.innerHTML = '<div class="inner"><div class="face front">?</div><div class="face backface">' + emoji + '</div></div>';
+      btn.addEventListener('click', () => flip(btn));
+      grid.appendChild(btn);
+    });
+  }
+
+  function flip(card) {
+    if (lock || card === first) return;
+    if (card.classList.contains('matched') || card.classList.contains('open')) return;
+    startTimer();
+    card.classList.add('open');
+    if (!first) {
+      first = card;
+      return;
+    }
+    moves++;
+    movesEl.textContent = moves;
+    if (first.dataset.emoji === card.dataset.emoji) {
+      first.classList.add('matched');
+      card.classList.add('matched');
+      first.classList.remove('open');
+      card.classList.remove('open');
+      first = null;
+      matched++;
+      if (matched === 8) win();
+    } else {
+      lock = true;
+      const a = first, b = card;
+      first = null;
+      setTimeout(() => {
+        a.classList.remove('open');
+        b.classList.remove('open');
+        lock = false;
+      }, 750);
+    }
+  }
+
+  function win() {
+    stopTimer();
+    const record = !best || moves < best;
+    if (record) {
+      best = moves;
+      storage.set(HS_KEY, best);
+      bestEl.textContent = best;
+    }
+    ovTitle.textContent = record ? '🏆 Novo recorde!' : '🎉 Você venceu!';
+    ovMsg.textContent = 'Encontrou todos os pares em ' + moves + ' jogadas e ' + fmt(seconds) + '.' +
+      (record ? ' Melhor marca até agora!' : ' Seu recorde é ' + best + ' jogadas.');
+    overlay.classList.remove('hidden');
+  }
+
+  document.getElementById('restart').addEventListener('click', deal);
+  document.getElementById('ov-btn').addEventListener('click', deal);
+  deal();
+})();
+</script>
+</body>
+</html>
