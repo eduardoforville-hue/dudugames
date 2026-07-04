@@ -369,96 +369,637 @@
 
   const suits = ['♠','♥','♦','♣'];
   const ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
-  function deck(oneSuit=false) {
-    const s = oneSuit ? ['♠'] : suits;
-    return shuffle(s.flatMap(suit => ranks.map((rank, i) => ({ suit, rank, value: i + 1, color: suit === '♥' || suit === '♦' ? 'red' : 'black', up: true }))));
+
+  function makeDeck(options = {}) {
+    const suitSet = options.suits || suits;
+    const decks = options.decks || 1;
+    const cards = [];
+    for (let d = 0; d < decks; d++) {
+      suitSet.forEach(suit => ranks.forEach((rank, i) => cards.push({
+        id: `${d}-${suit}-${rank}-${cards.length}`,
+        suit,
+        rank,
+        value: i + 1,
+        color: suit === '♥' || suit === '♦' ? 'red' : 'black',
+        up: options.faceUp !== false
+      })));
+    }
+    return shuffle(cards);
   }
-  function cardText(c) { return c ? c.rank + c.suit : ''; }
-  function renderCard(c) {
-    const el = button(cardText(c), 'card-tile ' + (c?.color || ''));
-    return el;
+
+  function cardText(c) {
+    return c ? c.rank + c.suit : '';
   }
 
   function runChess() {
     clearRoot();
-    const board = document.createElement('div'); board.className='chess-board'; root.appendChild(board);
-    let turn='w', selected=null, captures=0;
-    let b = [
-      ['♜','♞','♝','♛','♚','♝','♞','♜'],['♟','♟','♟','♟','♟','♟','♟','♟'],['','','','','','','',''],['','','','','','','',''],['','','','','','','',''],['','','','','','','',''],['♙','♙','♙','♙','♙','♙','♙','♙'],['♖','♘','♗','♕','♔','♗','♘','♖']
-    ];
-    const white='♙♖♘♗♕♔';
-    const black='♟♜♞♝♛♚';
-    function color(p){return white.includes(p)?'w':black.includes(p)?'b':'';}
-    function ok(sx,sy,tx,ty){
-      const p=b[sy][sx], dx=tx-sx, dy=ty-sy, adx=Math.abs(dx), ady=Math.abs(dy), c=color(p);
-      if(!p||color(b[ty][tx])===c)return false;
-      const clear=()=>{const stepx=Math.sign(dx),stepy=Math.sign(dy);let x=sx+stepx,y=sy+stepy;while(x!==tx||y!==ty){if(b[y][x])return false;x+=stepx;y+=stepy;}return true;};
-      if('♙♟'.includes(p)){const f=c==='w'?-1:1;return (dx===0&&!b[ty][tx]&&dy===f)||(dx===0&&!b[ty][tx]&&dy===2*f&&((c==='w'&&sy===6)||(c==='b'&&sy===1))&&!b[sy+f][sx])||(adx===1&&dy===f&&b[ty][tx]);}
-      if('♖♜'.includes(p))return (dx===0||dy===0)&&clear();
-      if('♗♝'.includes(p))return adx===ady&&clear();
-      if('♕♛'.includes(p))return (adx===ady||dx===0||dy===0)&&clear();
-      if('♘♞'.includes(p))return adx*ady===2;
-      if('♔♚'.includes(p))return adx<=1&&ady<=1;
+    const board = document.createElement('div');
+    const movesEl = document.createElement('div');
+    board.className = 'chess-board';
+    movesEl.className = 'chess-moves';
+    root.append(board, movesEl);
+
+    const icons = {
+      wp:'♙', wr:'♖', wn:'♘', wb:'♗', wq:'♕', wk:'♔',
+      bp:'♟', br:'♜', bn:'♞', bb:'♝', bq:'♛', bk:'♚'
+    };
+    let b, turn, selected, captures, enPassant, history, gameOver;
+
+    function piece(c, t) {
+      return { c, t, moved: false };
+    }
+    function setup() {
+      b = Array.from({ length: 8 }, () => Array(8).fill(null));
+      ['r','n','b','q','k','b','n','r'].forEach((t, x) => {
+        b[0][x] = piece('b', t);
+        b[1][x] = piece('b', 'p');
+        b[6][x] = piece('w', 'p');
+        b[7][x] = piece('w', t);
+      });
+      turn = 'w';
+      selected = null;
+      captures = 0;
+      enPassant = null;
+      history = [];
+      gameOver = false;
+      setScore(0);
+      updateStatus('Brancas');
+      setMsg('Xadrez para 2 jogadores: xeque, xeque-mate, roque, en passant e promoção automática para dama.');
+      dg.markPlayed(game);
+      render();
+    }
+    function inside(x, y) {
+      return x >= 0 && y >= 0 && x < 8 && y < 8;
+    }
+    function opposite(c) {
+      return c === 'w' ? 'b' : 'w';
+    }
+    function cloneBoard(src) {
+      return src.map(row => row.map(p => p ? { ...p } : null));
+    }
+    function findKing(color, boardState = b) {
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+        const p = boardState[y][x];
+        if (p && p.c === color && p.t === 'k') return { x, y };
+      }
+      return null;
+    }
+    function clearPath(sx, sy, tx, ty, boardState = b) {
+      const dx = Math.sign(tx - sx), dy = Math.sign(ty - sy);
+      let x = sx + dx, y = sy + dy;
+      while (x !== tx || y !== ty) {
+        if (boardState[y][x]) return false;
+        x += dx; y += dy;
+      }
+      return true;
+    }
+    function pseudoMoves(sx, sy, boardState = b, attacksOnly = false) {
+      const p = boardState[sy][sx];
+      if (!p) return [];
+      const out = [];
+      const add = (x, y) => {
+        if (!inside(x, y)) return;
+        const target = boardState[y][x];
+        if (!target || target.c !== p.c) out.push({ x, y });
+      };
+      if (p.t === 'p') {
+        const f = p.c === 'w' ? -1 : 1;
+        [-1, 1].forEach(dx => {
+          const x = sx + dx, y = sy + f;
+          if (inside(x, y) && (attacksOnly || boardState[y][x] || (enPassant && enPassant.x === x && enPassant.y === y))) add(x, y);
+        });
+        if (!attacksOnly) {
+          const one = sy + f, two = sy + f * 2;
+          if (inside(sx, one) && !boardState[one][sx]) add(sx, one);
+          if (!p.moved && inside(sx, two) && !boardState[one][sx] && !boardState[two][sx]) add(sx, two);
+        }
+      } else if (p.t === 'n') {
+        [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]].forEach(([dx, dy]) => add(sx + dx, sy + dy));
+      } else if (p.t === 'k') {
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy) add(sx + dx, sy + dy);
+        if (!attacksOnly && !p.moved && !inCheck(p.c, boardState)) {
+          [[7, 6, 5], [0, 2, 3]].forEach(([rookX, kingX, passX]) => {
+            const rook = boardState[sy][rookX];
+            const between = rookX === 7 ? [5, 6] : [1, 2, 3];
+            if (rook && rook.t === 'r' && rook.c === p.c && !rook.moved &&
+                between.every(x => !boardState[sy][x]) &&
+                !isAttacked(passX, sy, opposite(p.c), boardState) &&
+                !isAttacked(kingX, sy, opposite(p.c), boardState)) out.push({ x: kingX, y: sy, castle: rookX });
+          });
+        }
+      } else {
+        const dirs = {
+          r: [[1,0],[-1,0],[0,1],[0,-1]],
+          b: [[1,1],[1,-1],[-1,1],[-1,-1]],
+          q: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]
+        }[p.t];
+        dirs.forEach(([dx, dy]) => {
+          let x = sx + dx, y = sy + dy;
+          while (inside(x, y)) {
+            const target = boardState[y][x];
+            if (!target) out.push({ x, y });
+            else {
+              if (target.c !== p.c) out.push({ x, y });
+              break;
+            }
+            x += dx; y += dy;
+          }
+        });
+      }
+      return out.filter(m => {
+        const dx = m.x - sx, dy = m.y - sy;
+        if (['r','b','q'].includes(p.t)) return clearPath(sx, sy, m.x, m.y, boardState) && (boardState[m.y][m.x]?.c !== p.c);
+        if (p.t === 'p' && !attacksOnly && dx === 0) return !boardState[m.y][m.x];
+        return true;
+      });
+    }
+    function isAttacked(x, y, byColor, boardState = b) {
+      for (let sy = 0; sy < 8; sy++) for (let sx = 0; sx < 8; sx++) {
+        const p = boardState[sy][sx];
+        if (p && p.c === byColor && pseudoMoves(sx, sy, boardState, true).some(m => m.x === x && m.y === y)) return true;
+      }
       return false;
     }
-    function click(x,y){
-      const p=b[y][x];
-      if(selected){const [sx,sy]=selected;if(ok(sx,sy,x,y)){if(b[y][x])captures++; b[y][x]=b[sy][sx]; b[sy][sx]=''; turn=turn==='w'?'b':'w'; selected=null; setScore(captures); setAux(turn==='w'?'Brancas':'Pretas'); saveScore(captures); dg.markPlayed(game);} else selected=null; render(); return;}
-      if(p&&color(p)===turn){selected=[x,y];render();}
+    function inCheck(color, boardState = b) {
+      const k = findKing(color, boardState);
+      return !!k && isAttacked(k.x, k.y, opposite(color), boardState);
     }
-    function render(){board.innerHTML='';for(let y=0;y<8;y++)for(let x=0;x<8;x++){const cell=button(b[y][x],'chess-cell '+((x+y)%2?'dark':'light'));if(selected&&selected[0]===x&&selected[1]===y)cell.classList.add('sel');cell.onclick=()=>click(x,y);board.appendChild(cell);}}
-    startBtn.onclick=()=>location.reload();
-    setMsg('Xadrez local para 2 jogadores. Regras de movimento básicas, sem xeque automático.');
-    setScore(0); setAux('Brancas'); render();
+    function applyMove(boardState, sx, sy, move) {
+      const next = cloneBoard(boardState);
+      const moving = next[sy][sx];
+      const target = next[move.y][move.x];
+      if (moving.t === 'p' && enPassant && move.x === enPassant.x && move.y === enPassant.y && !target) {
+        next[enPassant.victimY][enPassant.victimX] = null;
+      }
+      next[move.y][move.x] = { ...moving, moved: true };
+      next[sy][sx] = null;
+      if (move.castle !== undefined) {
+        const rookTo = move.castle === 7 ? 5 : 3;
+        next[move.y][rookTo] = { ...next[move.y][move.castle], moved: true };
+        next[move.y][move.castle] = null;
+      }
+      if (moving.t === 'p' && (move.y === 0 || move.y === 7)) next[move.y][move.x].t = 'q';
+      return next;
+    }
+    function legalMoves(sx, sy) {
+      const p = b[sy][sx];
+      if (!p) return [];
+      return pseudoMoves(sx, sy).filter(m => !inCheck(p.c, applyMove(b, sx, sy, m)));
+    }
+    function hasLegalMove(color) {
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+        if (b[y][x]?.c === color && legalMoves(x, y).length) return true;
+      }
+      return false;
+    }
+    function notation(sx, sy, tx, ty, moving, captured) {
+      const files = 'abcdefgh';
+      return `${icons[moving.c + moving.t]} ${files[sx]}${8 - sy}-${files[tx]}${8 - ty}${captured ? 'x' : ''}`;
+    }
+    function updateStatus(label) {
+      setAux(label);
+    }
+    function click(x, y) {
+      if (gameOver) return;
+      const p = b[y][x];
+      if (selected) {
+        const [sx, sy] = selected;
+        if (sx === x && sy === y) {
+          selected = null;
+          render();
+          return;
+        }
+        if (p && p.c === turn) {
+          selected = [x, y];
+          render();
+          return;
+        }
+        const move = legalMoves(sx, sy).find(m => m.x === x && m.y === y);
+        if (!move) {
+          setMsg('Movimento inválido ou deixaria o rei em xeque.');
+          selected = null;
+          render();
+          return;
+        }
+        const moving = b[sy][sx];
+        const epCapture = moving.t === 'p' && enPassant && x === enPassant.x && y === enPassant.y && !b[y][x];
+        const captured = b[y][x] || (epCapture ? b[enPassant.victimY][enPassant.victimX] : null);
+        b = applyMove(b, sx, sy, move);
+        captures += captured ? 1 : 0;
+        history.unshift(notation(sx, sy, x, y, moving, captured));
+        enPassant = moving.t === 'p' && Math.abs(y - sy) === 2 ? { x, y: (y + sy) / 2, victimX: x, victimY: y } : null;
+        turn = opposite(turn);
+        selected = null;
+        setScore(captures);
+        saveScore(captures);
+        dg.sound(captured ? 'score' : 'tick');
+        if (inCheck(turn)) {
+          if (!hasLegalMove(turn)) {
+            gameOver = true;
+            updateStatus('Xeque-mate');
+            setMsg((turn === 'w' ? 'Pretas' : 'Brancas') + ' venceram por xeque-mate.');
+            dg.unlock('xadrez-mate');
+            dg.sound('win');
+          } else {
+            updateStatus((turn === 'w' ? 'Brancas' : 'Pretas') + ' em xeque');
+            setMsg('Xeque! Defenda o rei.');
+          }
+        } else if (!hasLegalMove(turn)) {
+          gameOver = true;
+          updateStatus('Afogamento');
+          setMsg('Empate por afogamento.');
+        } else {
+          updateStatus(turn === 'w' ? 'Brancas' : 'Pretas');
+          setMsg('Toque uma peça e depois uma casa válida.');
+        }
+        render();
+        return;
+      }
+      if (p && p.c === turn) {
+        selected = [x, y];
+        render();
+      }
+    }
+    function render() {
+      const legal = selected ? legalMoves(selected[0], selected[1]) : [];
+      board.innerHTML = '';
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+        const p = b[y][x];
+        const pieceClass = p ? (p.c === 'w' ? ' white-piece' : ' black-piece') : '';
+        const cell = button(p ? icons[p.c + p.t] : '', 'chess-cell ' + ((x + y) % 2 ? 'dark' : 'light') + pieceClass);
+        if (selected && selected[0] === x && selected[1] === y) cell.classList.add('sel');
+        if (legal.some(m => m.x === x && m.y === y)) cell.classList.add(p ? 'capture' : 'legal');
+        if (p?.t === 'k' && inCheck(p.c)) cell.classList.add('check');
+        cell.setAttribute('aria-label', `Casa ${x + 1}, ${y + 1}`);
+        cell.onclick = () => click(x, y);
+        board.appendChild(cell);
+      }
+      movesEl.textContent = history.slice(0, 6).join(' · ');
+    }
+    startBtn.onclick = setup;
+    setup();
   }
 
   function runSolitaire(kind) {
     clearRoot();
-    const area = document.createElement('div'); area.className='cards-area'; root.appendChild(area);
-    let stock=[], waste=[], foundations=[[],[],[],[]], cells=[], cols=[], moves=0;
-    function reset() {
-      const d = deck(kind === 'spider');
-      moves = 0; waste=[]; foundations=[[],[],[],[]]; cells=[null,null,null,null];
-      const count = kind === 'freecell' ? 8 : kind === 'spider' ? 10 : 7;
-      cols = Array.from({length:count},()=>[]);
-      if(kind==='freecell') d.forEach((c,i)=>cols[i%8].push(c));
-      else if(kind==='spider'){ for(let i=0;i<54;i++) cols[i%10].push(d[i%d.length]); stock=d.slice(0,30); }
-      else { for(let i=0;i<7;i++) for(let j=0;j<=i;j++) cols[i].push(d.pop()); stock=d; }
-      render(); dg.markPlayed(game);
+    const area = document.createElement('div');
+    area.className = 'cards-area';
+    root.appendChild(area);
+    let stock = [], waste = [], foundations = [], cells = [], cols = [], moves = 0, selected = null, won = false;
+
+    function foundationCount() {
+      return foundations.reduce((sum, f) => sum + f.length, 0);
     }
-    function canFoundation(c, f){const top=foundations[f].at(-1);return !top?c.value===1:top.suit===c.suit&&c.value===top.value+1;}
-    function autoFoundation(c){for(let i=0;i<4;i++)if(canFoundation(c,i)){foundations[i].push(c);moves++;return true;}return false;}
-    function completeSpider(col){const tail=col.slice(-13); if(tail.length===13&&tail.every((c,i)=>c.value===13-i)){col.splice(-13); foundations[0].push({rank:'K-A',suit:'♠',value:13,color:'black'}); dg.unlock('spider-run');}}
-    function clickCol(i){
-      const col=cols[i], c=col.at(-1); if(!c)return;
-      if(kind==='spider'){ for(const target of cols){const t=target.at(-1); if(target!==col && (!t || t.value===c.value+1)){target.push(col.pop()); completeSpider(target); moves++; render(); return;}} }
-      else if(autoFoundation(c)){col.pop();}
-      else if(kind==='freecell'){const empty=cells.findIndex(x=>!x); if(empty>=0){cells[empty]=col.pop();moves++;}}
+    function setCardMessage(text) {
+      setMsg(text);
+    }
+    function reset() {
+      moves = 0;
+      selected = null;
+      won = false;
+      waste = [];
+      cells = [null, null, null, null];
+      foundations = kind === 'spider'
+        ? Array.from({ length: 8 }, () => [])
+        : suits.map(suit => Object.assign([], { suit }));
+      if (kind === 'freecell') dealFreeCell();
+      else if (kind === 'spider') dealSpider();
+      else dealKlondike();
+      dg.markPlayed(game);
       render();
     }
-    function clickCell(i){const c=cells[i]; if(!c)return; if(autoFoundation(c)){cells[i]=null; render();}}
-    function drawStock(){
-      if(kind==='spider'){ if(stock.length<10)return; cols.forEach(col=>col.push(stock.pop())); }
-      else if(stock.length) waste.push(stock.pop()); else { stock=waste.reverse(); waste=[]; }
-      moves++; render();
+    function dealKlondike() {
+      const d = makeDeck({ faceUp: false });
+      cols = Array.from({ length: 7 }, () => []);
+      for (let i = 0; i < 7; i++) {
+        for (let j = 0; j <= i; j++) {
+          const c = d.pop();
+          c.up = j === i;
+          cols[i].push(c);
+        }
+      }
+      stock = d;
     }
-    function render(){
-      area.innerHTML='';
-      const top=document.createElement('div'); top.className='cards-top';
-      const s=button(kind==='spider'?'Comprar linha':'Comprar', 'card-pile'); s.onclick=drawStock; s.textContent += stock.length?' '+stock.length:''; top.appendChild(s);
-      if(kind==='klondike'){const w=renderCard(waste.at(-1)); w.onclick=()=>{const c=waste.at(-1); if(c&&autoFoundation(c)){waste.pop();render();}}; top.appendChild(w);}
-      if(kind==='freecell')cells.forEach((c,i)=>{const el=c?renderCard(c):button('Livre','card-pile');el.onclick=()=>clickCell(i);top.appendChild(el);});
-      foundations.forEach((f,i)=>{const el=f.length?renderCard(f.at(-1)):button('Base','card-pile');top.appendChild(el);});
+    function dealFreeCell() {
+      const d = makeDeck();
+      cols = Array.from({ length: 8 }, () => []);
+      d.forEach((c, i) => cols[i % 8].push(c));
+      stock = [];
+    }
+    function spiderSuits() {
+      if (difficulty() === 'easy') return ['♠'];
+      if (difficulty() === 'hard') return suits;
+      return ['♠', '♥'];
+    }
+    function dealSpider() {
+      const suitSet = spiderSuits();
+      const decks = Math.ceil(104 / (suitSet.length * 13));
+      const d = makeDeck({ suits: suitSet, decks, faceUp: false }).slice(0, 104);
+      cols = Array.from({ length: 10 }, () => []);
+      for (let i = 0; i < 54; i++) {
+        const c = d.pop();
+        c.up = i >= 44;
+        cols[i % 10].push(c);
+      }
+      stock = d;
+    }
+    function sameSelection(target) {
+      return selected && selected.zone === target.zone && selected.index === target.index && selected.cardIndex === target.cardIndex;
+    }
+    function clearSelection() {
+      selected = null;
+    }
+    function sourceCards() {
+      if (!selected) return [];
+      if (selected.zone === 'waste') return waste.length ? [waste.at(-1)] : [];
+      if (selected.zone === 'cell') return cells[selected.index] ? [cells[selected.index]] : [];
+      if (selected.zone === 'foundation') return foundations[selected.index].length ? [foundations[selected.index].at(-1)] : [];
+      if (selected.zone === 'col') return cols[selected.index].slice(selected.cardIndex);
+      return [];
+    }
+    function removeSource() {
+      const cards = sourceCards();
+      if (selected.zone === 'waste') waste.pop();
+      else if (selected.zone === 'cell') cells[selected.index] = null;
+      else if (selected.zone === 'foundation') foundations[selected.index].pop();
+      else if (selected.zone === 'col') cols[selected.index].splice(selected.cardIndex);
+      revealColumns();
+      return cards;
+    }
+    function restoreSource(cards) {
+      if (selected.zone === 'waste') waste.push(...cards);
+      else if (selected.zone === 'cell') cells[selected.index] = cards[0];
+      else if (selected.zone === 'foundation') foundations[selected.index].push(...cards);
+      else if (selected.zone === 'col') cols[selected.index].push(...cards);
+    }
+    function revealColumns() {
+      cols.forEach(col => {
+        const top = col.at(-1);
+        if (top && !top.up) top.up = true;
+      });
+    }
+    function isAltDescending(cards) {
+      return cards.every((c, i) => i === 0 || (cards[i - 1].value === c.value + 1 && cards[i - 1].color !== c.color));
+    }
+    function isSpiderRun(cards) {
+      return cards.every((c, i) => c.up && (i === 0 || (cards[i - 1].value === c.value + 1 && cards[i - 1].suit === c.suit)));
+    }
+    function canSelectColumn(i, cardIndex) {
+      const cards = cols[i].slice(cardIndex);
+      if (!cards.length || !cards[0].up) return false;
+      if (kind === 'spider') return isSpiderRun(cards);
+      if (kind === 'freecell' && cards.length > movableLimit(i)) return false;
+      return isAltDescending(cards);
+    }
+    function movableLimit(sourceCol) {
+      if (kind !== 'freecell') return Infinity;
+      const freeCells = cells.filter(c => !c).length;
+      const emptyCols = cols.filter((col, i) => !col.length && i !== sourceCol).length;
+      return (freeCells + 1) * Math.pow(2, emptyCols);
+    }
+    function movableLimitTo(sourceCol, targetCol) {
+      if (kind !== 'freecell') return Infinity;
+      const freeCells = cells.filter(c => !c).length;
+      const emptyCols = cols.filter((col, i) => !col.length && i !== sourceCol && i !== targetCol).length;
+      return (freeCells + 1) * Math.pow(2, emptyCols);
+    }
+    function canFoundation(card, i) {
+      if (kind === 'spider') return false;
+      const f = foundations[i];
+      if (f.suit !== card.suit) return false;
+      const top = f.at(-1);
+      return top ? card.value === top.value + 1 : card.value === 1;
+    }
+    function canMoveToColumn(cards, i) {
+      if (!cards.length) return false;
+      const first = cards[0];
+      const target = cols[i].at(-1);
+      if (kind === 'klondike') return target ? target.up && target.value === first.value + 1 && target.color !== first.color : first.value === 13;
+      if (kind === 'freecell') {
+        if (selected?.zone === 'col' && cards.length > movableLimitTo(selected.index, i)) return false;
+        return target ? target.value === first.value + 1 && target.color !== first.color : true;
+      }
+      return target ? target.up && target.value === first.value + 1 : true;
+    }
+    function selectWaste() {
+      if (!waste.length) return;
+      selected = { zone: 'waste' };
+      setCardMessage('Carta do descarte selecionada. Toque numa base ou coluna válida.');
+      render();
+    }
+    function selectCell(i) {
+      if (!cells[i]) return;
+      selected = { zone: 'cell', index: i };
+      setCardMessage('Célula livre selecionada.');
+      render();
+    }
+    function selectFoundation(i) {
+      if (selected) {
+        moveToFoundation(i);
+        return;
+      }
+      if (kind !== 'spider' && foundations[i].length) {
+        selected = { zone: 'foundation', index: i };
+        setCardMessage('Base selecionada. Você pode devolver para uma coluna válida.');
+        render();
+      }
+    }
+    function selectColumn(i, cardIndex = cols[i].length - 1) {
+      if (selected) {
+        moveToColumn(i);
+        return;
+      }
+      if (!canSelectColumn(i, cardIndex)) {
+        setCardMessage(kind === 'spider' ? 'No Spider só dá para mover sequências abertas do mesmo naipe.' : 'Selecione uma sequência decrescente alternando cores.');
+        return;
+      }
+      selected = { zone: 'col', index: i, cardIndex };
+      setCardMessage('Sequência selecionada. Toque no destino.');
+      render();
+    }
+    function moveToCell(i) {
+      const cards = sourceCards();
+      if (kind !== 'freecell' || cells[i] || cards.length !== 1) {
+        setCardMessage('A célula livre recebe uma carta por vez.');
+        return;
+      }
+      const moving = removeSource();
+      cells[i] = moving[0];
+      finishMove('Carta enviada para célula livre.');
+    }
+    function moveToFoundation(i) {
+      const cards = sourceCards();
+      if (cards.length !== 1 || !canFoundation(cards[0], i)) {
+        setCardMessage('Essa carta ainda não pode ir para a base.');
+        clearSelection();
+        render();
+        return;
+      }
+      const moving = removeSource();
+      foundations[i].push(moving[0]);
+      finishMove('Carta enviada para a base.');
+    }
+    function moveToColumn(i) {
+      const cards = sourceCards();
+      if (!cards.length || (selected.zone === 'col' && selected.index === i)) {
+        clearSelection();
+        render();
+        return;
+      }
+      if (!canMoveToColumn(cards, i)) {
+        setCardMessage('Destino inválido para essa sequência.');
+        clearSelection();
+        render();
+        return;
+      }
+      const moving = removeSource();
+      cols[i].push(...moving);
+      if (kind === 'spider') completeSpiderRuns();
+      finishMove('Movimento realizado.');
+    }
+    function finishMove(message) {
+      moves++;
+      clearSelection();
+      dg.sound('tick');
+      setCardMessage(message);
+      checkWin();
+      render();
+    }
+    function drawStock() {
+      clearSelection();
+      if (kind === 'spider') {
+        if (!stock.length) {
+          setCardMessage('Estoque vazio.');
+          return;
+        }
+        if (cols.some(col => !col.length)) {
+          setCardMessage('No Spider, preencha todas as colunas antes de comprar.');
+          render();
+          return;
+        }
+        cols.forEach(col => {
+          const c = stock.pop();
+          c.up = true;
+          col.push(c);
+        });
+        moves++;
+        setCardMessage('Nova linha distribuída.');
+      } else {
+        if (stock.length) {
+          const draw = difficulty() === 'hard' && kind === 'klondike' ? 3 : 1;
+          for (let i = 0; i < draw && stock.length; i++) {
+            const c = stock.pop();
+            c.up = true;
+            waste.push(c);
+          }
+          moves++;
+          setCardMessage('Carta comprada.');
+        } else if (waste.length) {
+          stock = waste.reverse().map(c => ({ ...c, up: false }));
+          waste = [];
+          moves++;
+          setCardMessage('Descarte voltou para o estoque.');
+        }
+      }
+      render();
+    }
+    function completeSpiderRuns() {
+      cols.forEach(col => {
+        let again = true;
+        while (again) {
+          again = false;
+          const tail = col.slice(-13);
+          if (tail.length === 13 && tail[0].value === 13 && tail.every((c, i) => c.up && c.value === 13 - i && c.suit === tail[0].suit)) {
+            col.splice(-13);
+            foundations[foundations.findIndex(f => !f.length)].push(...tail);
+            revealColumns();
+            dg.unlock('spider-run');
+            dg.sound('score');
+            again = true;
+          }
+        }
+      });
+    }
+    function checkWin() {
+      const done = kind === 'spider' ? foundations.every(f => f.length === 13) : foundationCount() === 52;
+      if (done && !won) {
+        won = true;
+        saveScore(moves);
+        dg.unlock(kind + '-win');
+        setCardMessage('Vitória em ' + moves + ' movimentos!');
+        dg.sound('win');
+      }
+    }
+    function cardButton(card, onClick, extra = '') {
+      const el = button(card.up ? cardText(card) : '◆', 'playing-card ' + (card.up ? card.color : 'is-down') + ' ' + extra);
+      el.onclick = onClick;
+      el.setAttribute('aria-label', card.up ? cardText(card) : 'Carta virada');
+      return el;
+    }
+    function slot(text, onClick, extra = '') {
+      const el = button(text, 'card-slot ' + extra);
+      el.onclick = onClick;
+      return el;
+    }
+    function renderTop() {
+      const top = document.createElement('div');
+      top.className = 'cards-top';
+      if (kind !== 'freecell') top.appendChild(slot(kind === 'spider' ? `Comprar ${Math.ceil(stock.length / 10)}` : `Estoque ${stock.length}`, drawStock, stock.length ? '' : 'empty'));
+      if (kind === 'klondike') {
+        const wasteTop = waste.at(-1);
+        top.appendChild(wasteTop ? cardButton(wasteTop, selectWaste, selected?.zone === 'waste' ? 'is-selected' : '') : slot('Descarte', () => {}, 'empty'));
+      }
+      if (kind === 'freecell') cells.forEach((c, i) => top.appendChild(c
+        ? cardButton(c, () => selected ? moveToCell(i) : selectCell(i), selected?.zone === 'cell' && selected.index === i ? 'is-selected' : '')
+        : slot('Livre', () => selected ? moveToCell(i) : null, 'empty')));
+      foundations.forEach((f, i) => {
+        const label = kind === 'spider' ? (f.length ? 'K-A' : 'Sequência') : (f.length ? cardText(f.at(-1)) : 'Base ' + f.suit);
+        const el = f.length && kind !== 'spider'
+          ? cardButton(f.at(-1), () => selectFoundation(i), selected?.zone === 'foundation' && selected.index === i ? 'is-selected' : '')
+          : slot(label, () => selectFoundation(i), f.length ? 'complete' : 'empty');
+        top.appendChild(el);
+      });
       area.appendChild(top);
-      const table=document.createElement('div'); table.className='cards-table cards-' + cols.length;
-      cols.forEach((col,i)=>{const stack=document.createElement('button');stack.type='button';stack.className='card-stack';stack.onclick=()=>clickCol(i);stack.innerHTML=col.map(cardText).join('<br>')||'·';table.appendChild(stack);});
-      area.appendChild(table);
-      setScore(moves); setAux(foundations.reduce((a,f)=>a+f.length,0)+' bases');
-      const done = kind==='spider'?foundations[0].length>=4:foundations.reduce((a,f)=>a+f.length,0)>=52;
-      if(done){saveScore(moves);dg.unlock(kind+'-win');setMsg('Vitória em '+moves+' movimentos!');}
     }
-    startBtn.onclick=reset;
-    setMsg(kind==='klondike'?'Paciência simplificada: compre cartas e envie ases às bases.':kind==='freecell'?'Use células livres e complete as bases.':'Spider 1 naipe: monte sequências do Rei ao Ás.');
+    function renderColumns() {
+      const table = document.createElement('div');
+      table.className = 'cards-table cards-' + cols.length;
+      cols.forEach((col, i) => {
+        const stack = document.createElement('div');
+        stack.className = 'card-stack';
+        stack.onclick = event => {
+          if (event.target === stack) selected ? moveToColumn(i) : null;
+        };
+        if (!col.length) stack.appendChild(slot('Vazio', () => selected ? moveToColumn(i) : null, 'empty'));
+        col.forEach((card, cardIndex) => {
+          const extra = selected?.zone === 'col' && selected.index === i && cardIndex >= selected.cardIndex ? 'is-selected' : '';
+          const el = cardButton(card, event => {
+            event.stopPropagation();
+            if (sameSelection({ zone: 'col', index: i, cardIndex })) {
+              clearSelection();
+              render();
+            } else {
+              selectColumn(i, cardIndex);
+            }
+          }, extra);
+          stack.appendChild(el);
+        });
+        table.appendChild(stack);
+      });
+      area.appendChild(table);
+    }
+    function render() {
+      area.innerHTML = '';
+      renderTop();
+      renderColumns();
+      setScore(moves);
+      if (kind === 'spider') setAux(foundations.filter(f => f.length).length + '/8 seq.');
+      else setAux(foundationCount() + '/52 bases');
+    }
+    startBtn.onclick = reset;
+    if (kind === 'klondike') setCardMessage('Paciência completa: toque numa carta e depois no destino. No difícil, compra 3.');
+    else if (kind === 'freecell') setCardMessage('FreeCell completo: use 4 células livres e mova sequências conforme espaços disponíveis.');
+    else setCardMessage('Spider completo: fácil 1 naipe, normal 2, difícil 4. Monte sequências K-A do mesmo naipe.');
     reset();
   }
 
@@ -477,7 +1018,7 @@
     spider: () => runSolitaire('spider')
   };
 
-  dg.installControls({ difficulty: !['xadrez','paciencia','freecell','spider','quiz','memoria-temas'].includes(game), onDifficultyChange: () => runners[game]() });
+  dg.installControls({ difficulty: !['xadrez','freecell','quiz','memoria-temas'].includes(game), onDifficultyChange: () => runners[game]() });
   window.addEventListener('dudu-reset', () => { best = 0; bestEl.textContent = '-'; });
   runners[game]();
 })();

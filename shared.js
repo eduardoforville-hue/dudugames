@@ -63,9 +63,11 @@
     { id: 'genius-8', title: 'Memória elétrica', desc: 'Chegou à fase 8 no Genius 2.0.' },
     { id: 'memoria-temas-win', title: 'Tema dominado', desc: 'Venceu a Memória com Temas.' },
     { id: 'pacman-clear', title: 'Labirinto limpo', desc: 'Comeu todos os pontos no Pac-Man.' },
+    { id: 'xadrez-mate', title: 'Xeque-mate', desc: 'Venceu uma partida de Xadrez.' },
     { id: 'klondike-win', title: 'Paciência completa', desc: 'Terminou uma partida de Paciência.' },
     { id: 'freecell-win', title: 'Células livres', desc: 'Terminou uma partida de FreeCell.' },
     { id: 'spider-run', title: 'Sequência tecida', desc: 'Fechou uma sequência no Spider.' },
+    { id: 'spider-win', title: 'Teia completa', desc: 'Terminou uma partida de Spider.' },
     { id: 'all-games', title: 'Tour completo', desc: 'Jogou todos os jogos.' }
   ];
 
