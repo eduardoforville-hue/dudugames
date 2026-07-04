@@ -32,6 +32,24 @@ html[data-theme="light"] {
   --overlay-bg: rgba(248,250,252,.88);
 }
 
+html[data-shop-theme="theme-ocean"] {
+  --page-bg: radial-gradient(ellipse at top, #075985 0%, #06342f 68%, #07111f 100%);
+  --accent: #2dd4bf;
+  --accent-2: #7dd3fc;
+}
+
+html[data-shop-theme="theme-sunset"] {
+  --page-bg: radial-gradient(ellipse at top, #7c2d12 0%, #581c87 58%, #111827 100%);
+  --accent: #fbbf24;
+  --accent-2: #fb7185;
+}
+
+html[data-shop-theme="theme-arcade"] {
+  --page-bg: radial-gradient(ellipse at top, #3b0764 0%, #111827 52%, #020617 100%);
+  --accent: #f0abfc;
+  --accent-2: #38bdf8;
+}
+
 body {
   background: var(--page-bg) !important;
   color: var(--text) !important;
@@ -109,6 +127,11 @@ a.card:hover,
   transform: translateY(1px);
 }
 
+.dg-control:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
 select.dg-control {
   appearance: auto;
 }
@@ -172,6 +195,93 @@ select.dg-control {
 
 .dg-achievement.locked {
   opacity: .55;
+}
+
+.dg-profile-card,
+.dg-tournament,
+.dg-mission,
+.dg-shop-item {
+  display: grid;
+  gap: 10px;
+}
+
+.dg-profile-card {
+  grid-template-columns: auto minmax(140px, 1fr);
+  align-items: center;
+}
+
+.dg-avatar {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-strong);
+  font-size: 30px;
+}
+
+.dg-profile-card label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: left;
+}
+
+.dg-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+
+.dg-profile-stats {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.dg-profile-stats span,
+.dg-mission,
+.dg-shop-item,
+.dg-tournament {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+}
+
+.dg-profile-stats b {
+  color: var(--accent);
+}
+
+.dg-missions,
+.dg-store {
+  display: grid;
+  gap: 10px;
+}
+
+.dg-mission,
+.dg-shop-item,
+.dg-tournament {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  text-align: left;
+}
+
+.dg-mission span,
+.dg-shop-item span,
+.dg-tournament span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .dg-toast {
@@ -783,6 +893,19 @@ select.dg-control {
     min-height: 44px;
     min-width: 50px;
     padding: 10px 12px;
+  }
+
+  .dg-profile-card,
+  .dg-mission,
+  .dg-shop-item,
+  .dg-tournament {
+    grid-template-columns: 1fr;
+  }
+
+  .dg-mission .dg-control,
+  .dg-shop-item .dg-control,
+  .dg-tournament .dg-control {
+    width: 100%;
   }
 
   .game-canvas {

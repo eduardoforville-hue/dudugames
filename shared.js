@@ -6,6 +6,11 @@
   const SETTINGS_KEY = 'dudu-settings';
   const ACHIEVEMENTS_KEY = 'dudu-conquistas';
   const PLAYED_KEY = 'dudu-jogos-jogados';
+  const PROFILE_KEY = 'dudu-profile';
+  const DAILY_KEY = 'dudu-daily';
+  const WALLET_KEY = 'dudu-wallet';
+  const STORE_KEY = 'dudu-store';
+  const TOURNAMENT_KEY = 'dudu-tournament';
 
   const records = {
     snake: { label: 'Cobrinha', key: 'cobrinha-recorde', unit: 'pts', better: 'higher' },
@@ -66,7 +71,47 @@
     { id: 'freecell-win', title: 'Células livres', desc: 'Terminou uma partida de FreeCell.' },
     { id: 'spider-run', title: 'Sequência tecida', desc: 'Fechou uma sequência no Spider.' },
     { id: 'spider-win', title: 'Teia completa', desc: 'Terminou uma partida de Spider.' },
+    { id: 'daily-first', title: 'Missão cumprida', desc: 'Concluiu uma missão diária.' },
+    { id: 'tournament-finish', title: 'Mini-campeão', desc: 'Terminou um torneio de 5 jogos.' },
     { id: 'all-games', title: 'Tour completo', desc: 'Jogou todos os jogos.' }
+  ];
+
+  const gameRoutes = {
+    snake: 'cobrinha/',
+    memory: 'memoria/',
+    game2048: '2048/',
+    mines: 'campo-minado/',
+    velha: 'velha/',
+    pong: 'pong/',
+    tetris: 'tetris/',
+    simon: 'simon/',
+    forca: 'forca/',
+    sudoku: 'sudoku/',
+    invaders: 'space-invaders/',
+    golfe: 'golfe/',
+    flappy: 'flappy/',
+    breakout: 'breakout/',
+    dino: 'dino/',
+    labirinto: 'labirinto/',
+    bolha: 'bolha/',
+    whack: 'whack/',
+    genius2: 'genius2/',
+    'memoria-temas': 'memoria-temas/',
+    pacman: 'pacman/',
+    xadrez: 'xadrez/',
+    paciencia: 'paciencia/',
+    freecell: 'freecell/',
+    spider: 'spider/'
+  };
+
+  const tournamentGames = ['snake', 'pong', 'dino', 'breakout', 'labirinto', 'bolha', 'whack', 'genius2', 'pacman', 'tetris'];
+
+  const storeItems = [
+    { id: 'theme-ocean', type: 'theme', title: 'Tema Oceano', desc: 'Azul, verde e fundo profundo.', price: 30 },
+    { id: 'theme-sunset', type: 'theme', title: 'Tema Pôr do Sol', desc: 'Rosa, amarelo e contraste quente.', price: 45 },
+    { id: 'theme-arcade', type: 'theme', title: 'Tema Arcade', desc: 'Visual neon com fundo mais vibrante.', price: 60 },
+    { id: 'avatar-star', type: 'avatar', title: 'Avatar Estrela', desc: 'Um avatar brilhante para o perfil.', price: 20 },
+    { id: 'avatar-crown', type: 'avatar', title: 'Avatar Coroa', desc: 'Visual de campeão local.', price: 50 }
   ];
 
   const defaults = {
@@ -116,8 +161,75 @@
     } catch {}
   }
 
+  function todayKey() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function seededOrder(items, seed) {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+    return [...items].sort((a, b) => {
+      const av = (hash ^ a.charCodeAt(0) ^ a.length) % 997;
+      const bv = (hash ^ b.charCodeAt(0) ^ b.length) % 997;
+      return av - bv;
+    });
+  }
+
+  function getWallet() {
+    return Number(getItem(WALLET_KEY)) || 0;
+  }
+
+  function addCoins(amount) {
+    const next = Math.max(0, getWallet() + amount);
+    setItem(WALLET_KEY, next);
+    window.dispatchEvent(new CustomEvent('dudu-wallet-change'));
+    return next;
+  }
+
   function getSettings() {
     return { ...defaults, ...getJson(SETTINGS_KEY, {}) };
+  }
+
+  function getProfile() {
+    return { name: 'Dudu', avatar: '🎮', ...getJson(PROFILE_KEY, {}) };
+  }
+
+  function saveProfile(profile) {
+    setJson(PROFILE_KEY, { ...getProfile(), ...profile });
+    window.dispatchEvent(new CustomEvent('dudu-profile-change'));
+  }
+
+  function getStore() {
+    return { owned: {}, activeTheme: '', activeAvatar: '', ...getJson(STORE_KEY, {}) };
+  }
+
+  function saveStore(store) {
+    setJson(STORE_KEY, store);
+    applyTheme();
+    window.dispatchEvent(new CustomEvent('dudu-store-change'));
+  }
+
+  function buyStoreItem(id) {
+    const item = storeItems.find(entry => entry.id === id);
+    if (!item) return false;
+    const store = getStore();
+    if (!store.owned[id]) {
+      if (getWallet() < item.price) {
+        toast('Moedas insuficientes.');
+        return false;
+      }
+      addCoins(-item.price);
+      store.owned[id] = true;
+      toast('Desbloqueado: ' + item.title);
+    }
+    if (item.type === 'theme') store.activeTheme = id;
+    if (item.type === 'avatar') {
+      store.activeAvatar = id;
+      saveProfile({ avatar: id === 'avatar-star' ? '⭐' : '👑' });
+    }
+    saveStore(store);
+    return true;
   }
 
   function saveSettings(next) {
@@ -129,7 +241,9 @@
   }
 
   function applyTheme() {
-    document.documentElement.dataset.theme = getSettings().theme;
+    const html = document.documentElement;
+    html.dataset.theme = getSettings().theme;
+    html.dataset.shopTheme = getStore().activeTheme || '';
   }
 
   function getDifficulty() {
@@ -175,6 +289,8 @@
       setItem(meta.key, value);
       window.dispatchEvent(new CustomEvent('dudu-record-change'));
     }
+    updateDailyByScore(game, value);
+    updateTournament(game, value);
     return isRecord;
   }
 
@@ -182,6 +298,7 @@
     const played = getJson(PLAYED_KEY, {});
     played[game] = true;
     setJson(PLAYED_KEY, played);
+    updateDailyPlayed(game);
     unlock('first-play');
     if (Object.keys(records).every(key => played[key])) unlock('all-games');
   }
@@ -195,6 +312,7 @@
     if (unlocked[id]) return false;
     unlocked[id] = new Date().toISOString();
     setJson(ACHIEVEMENTS_KEY, unlocked);
+    updateDailyByAchievement(id);
     const achievement = achievements.find(item => item.id === id);
     if (achievement) {
       toast('Conquista desbloqueada: ' + achievement.title);
@@ -202,6 +320,131 @@
       window.dispatchEvent(new CustomEvent('dudu-achievement-change'));
     }
     return true;
+  }
+
+  function freshDaily() {
+    return {
+      date: todayKey(),
+      played: {},
+      wins: {},
+      score: {},
+      claimed: {}
+    };
+  }
+
+  function getDaily() {
+    const daily = getJson(DAILY_KEY, freshDaily());
+    if (daily.date !== todayKey()) {
+      const next = freshDaily();
+      setJson(DAILY_KEY, next);
+      return next;
+    }
+    return { ...freshDaily(), ...daily };
+  }
+
+  function saveDaily(daily) {
+    setJson(DAILY_KEY, daily);
+    window.dispatchEvent(new CustomEvent('dudu-daily-change'));
+  }
+
+  function dailyMissions() {
+    const order = seededOrder(['snake100', 'play3', 'win2', 'tetris300', 'dino80'], todayKey());
+    const picked = ['snake100', ...order.filter(id => id !== 'snake100')].slice(0, 3);
+    const labels = {
+      snake100: { title: 'Faça 100 pontos na Cobrinha', reward: 20, total: 1 },
+      play3: { title: 'Jogue 3 jogos diferentes', reward: 15, total: 3 },
+      win2: { title: 'Vença 2 partidas', reward: 25, total: 2 },
+      tetris300: { title: 'Faça 300 pontos no Tetris', reward: 20, total: 1 },
+      dino80: { title: 'Corra 80m no Dino Runner', reward: 20, total: 1 }
+    };
+    return picked.map(id => ({ id, ...labels[id] }));
+  }
+
+  function missionProgress(id, daily = getDaily()) {
+    if (id === 'snake100') return daily.score.snake >= 100 ? 1 : 0;
+    if (id === 'tetris300') return daily.score.tetris >= 300 ? 1 : 0;
+    if (id === 'dino80') return daily.score.dino >= 80 ? 1 : 0;
+    if (id === 'play3') return Math.min(3, Object.keys(daily.played).length);
+    if (id === 'win2') return Math.min(2, Object.keys(daily.wins).length);
+    return 0;
+  }
+
+  function updateDailyPlayed(game) {
+    const daily = getDaily();
+    daily.played[game] = true;
+    saveDaily(daily);
+  }
+
+  function updateDailyByScore(game, value) {
+    const daily = getDaily();
+    daily.score[game] = Math.max(Number(daily.score[game]) || 0, value);
+    saveDaily(daily);
+  }
+
+  function updateDailyByAchievement(id) {
+    if (!/win|clear|mate|par|perfect|completa|run/.test(id)) return;
+    const daily = getDaily();
+    daily.wins[id] = true;
+    saveDaily(daily);
+  }
+
+  function claimDaily(id) {
+    const daily = getDaily();
+    const mission = dailyMissions().find(item => item.id === id);
+    if (!mission || daily.claimed[id] || missionProgress(id, daily) < mission.total) return false;
+    daily.claimed[id] = true;
+    saveDaily(daily);
+    addCoins(mission.reward);
+    unlock('daily-first');
+    toast('Missão concluída: +' + mission.reward + ' moedas.');
+    return true;
+  }
+
+  function getTournament() {
+    return getJson(TOURNAMENT_KEY, null);
+  }
+
+  function saveTournament(tournament) {
+    if (!tournament) removeItem(TOURNAMENT_KEY);
+    else setJson(TOURNAMENT_KEY, tournament);
+    window.dispatchEvent(new CustomEvent('dudu-tournament-change'));
+  }
+
+  function startTournament() {
+    const games = seededOrder(tournamentGames, String(Date.now())).slice(0, 5);
+    const tournament = {
+      id: Date.now(),
+      games,
+      index: 0,
+      scores: {},
+      complete: false
+    };
+    saveTournament(tournament);
+    toast('Torneio iniciado: 5 jogos em sequência.');
+    location.href = root + gameRoutes[games[0]] + '?torneio=1';
+  }
+
+  function updateTournament(game, value) {
+    const tournament = getTournament();
+    if (!tournament || tournament.complete || tournament.games[tournament.index] !== game) return;
+    tournament.scores[game] = Math.max(Number(tournament.scores[game]) || 0, value);
+    tournament.index += 1;
+    if (tournament.index >= tournament.games.length) {
+      tournament.complete = true;
+      tournament.total = Object.values(tournament.scores).reduce((sum, n) => sum + Number(n || 0), 0);
+      addCoins(40);
+      unlock('tournament-finish');
+      toast('Torneio completo! +' + tournament.total + ' pontos e +40 moedas.');
+    } else {
+      toast('Jogo registrado. Próximo: ' + records[tournament.games[tournament.index]].label + '.');
+    }
+    saveTournament(tournament);
+  }
+
+  function tournamentNextUrl() {
+    const tournament = getTournament();
+    if (!tournament || tournament.complete) return root;
+    return root + gameRoutes[tournament.games[tournament.index]] + '?torneio=1';
   }
 
   function toast(message) {
@@ -276,6 +519,14 @@
       bar.appendChild(select);
     }
 
+    const tournament = getTournament();
+    if (tournament && !tournament.complete) {
+      const next = button('Torneio ' + (tournament.index + 1) + '/5');
+      next.title = 'Continuar torneio';
+      next.addEventListener('click', () => { location.href = tournamentNextUrl(); });
+      bar.appendChild(next);
+    }
+
     const reset = button('Zerar recordes', 'dg-danger');
     reset.title = 'Apagar recordes e conquistas deste navegador';
     reset.addEventListener('click', () => {
@@ -315,12 +566,122 @@
     });
   }
 
+  function renderProfile() {
+    const target = document.querySelector('[data-dg-profile]');
+    if (!target) return;
+    const profile = getProfile();
+    const played = Object.keys(getJson(PLAYED_KEY, {})).length;
+    const unlocked = Object.keys(getUnlocked()).length;
+    const recordCount = Object.keys(records).filter(key => getRecord(key)).length;
+    target.innerHTML = `
+      <div class="dg-profile-card">
+        <div class="dg-avatar">${profile.avatar}</div>
+        <label>Nome<input class="dg-input" data-profile-name value="${profile.name.replace(/"/g, '&quot;')}" maxlength="18"></label>
+        <div class="dg-profile-stats">
+          <span><b>${played}</b> jogos</span>
+          <span><b>${recordCount}</b> recordes</span>
+          <span><b>${unlocked}</b> conquistas</span>
+          <span><b>${getWallet()}</b> moedas</span>
+        </div>
+      </div>
+    `;
+    const input = target.querySelector('[data-profile-name]');
+    input.addEventListener('change', () => saveProfile({ name: input.value.trim() || 'Dudu' }));
+  }
+
+  function renderDailyMissions() {
+    const target = document.querySelector('[data-dg-daily]');
+    if (!target) return;
+    const daily = getDaily();
+    target.innerHTML = dailyMissions().map(mission => {
+      const progress = missionProgress(mission.id, daily);
+      const done = progress >= mission.total;
+      const claimed = daily.claimed[mission.id];
+      return `
+        <div class="dg-mission">
+          <b>${mission.title}</b>
+          <span>${progress}/${mission.total} · +${mission.reward} moedas</span>
+          <button class="dg-control" data-claim="${mission.id}" ${done && !claimed ? '' : 'disabled'}>${claimed ? 'Recebida' : done ? 'Receber' : 'Em andamento'}</button>
+        </div>
+      `;
+    }).join('');
+    target.querySelectorAll('[data-claim]').forEach(btn => btn.addEventListener('click', () => {
+      claimDaily(btn.dataset.claim);
+      renderDailyMissions();
+      renderProfile();
+      renderStore();
+    }));
+  }
+
+  function renderTournament() {
+    const target = document.querySelector('[data-dg-tournament]');
+    if (!target) return;
+    const tournament = getTournament();
+    if (!tournament) {
+      target.innerHTML = `
+        <div class="dg-tournament">
+          <div><b>Modo torneio</b><span>Jogue 5 mini-jogos seguidos e some a pontuação.</span></div>
+          <button class="dg-control" data-tournament-start>Começar</button>
+        </div>
+      `;
+    } else {
+      const total = Object.values(tournament.scores || {}).reduce((sum, n) => sum + Number(n || 0), 0);
+      const current = tournament.complete ? 'Finalizado' : records[tournament.games[tournament.index]].label;
+      target.innerHTML = `
+        <div class="dg-tournament">
+          <div><b>${tournament.complete ? 'Torneio completo' : 'Torneio em andamento'}</b><span>${current} · ${tournament.index}/${tournament.games.length} jogos · ${total} pts</span></div>
+          <button class="dg-control" data-tournament-next>${tournament.complete ? 'Novo torneio' : 'Continuar'}</button>
+          <button class="dg-control dg-danger" data-tournament-reset>Cancelar</button>
+        </div>
+      `;
+    }
+    target.querySelector('[data-tournament-start]')?.addEventListener('click', startTournament);
+    target.querySelector('[data-tournament-next]')?.addEventListener('click', () => {
+      if (getTournament()?.complete) startTournament();
+      else location.href = tournamentNextUrl();
+    });
+    target.querySelector('[data-tournament-reset]')?.addEventListener('click', () => {
+      saveTournament(null);
+      renderTournament();
+    });
+  }
+
+  function renderStore() {
+    const target = document.querySelector('[data-dg-store]');
+    if (!target) return;
+    const store = getStore();
+    target.innerHTML = storeItems.map(item => {
+      const owned = Boolean(store.owned[item.id]);
+      const active = store.activeTheme === item.id || store.activeAvatar === item.id;
+      return `
+        <div class="dg-shop-item">
+          <b>${item.title}</b>
+          <span>${item.desc}</span>
+          <button class="dg-control" data-buy="${item.id}">${active ? 'Ativo' : owned ? 'Usar' : item.price + ' moedas'}</button>
+        </div>
+      `;
+    }).join('');
+    target.querySelectorAll('[data-buy]').forEach(btn => btn.addEventListener('click', () => {
+      buyStoreItem(btn.dataset.buy);
+      renderStore();
+      renderProfile();
+    }));
+  }
+
   function initHome() {
     installControls();
+    renderProfile();
+    renderTournament();
+    renderDailyMissions();
+    renderStore();
     renderRecords();
     renderAchievements();
     window.addEventListener('dudu-record-change', renderRecords);
     window.addEventListener('dudu-achievement-change', renderAchievements);
+    window.addEventListener('dudu-profile-change', renderProfile);
+    window.addEventListener('dudu-wallet-change', () => { renderProfile(); renderStore(); });
+    window.addEventListener('dudu-daily-change', renderDailyMissions);
+    window.addEventListener('dudu-tournament-change', renderTournament);
   }
 
   function registerServiceWorker() {
@@ -335,18 +696,33 @@
 
   window.DuduGames = {
     achievements,
+    addCoins,
+    buyStoreItem,
     clearProgress,
+    claimDaily,
     getDifficulty,
+    getProfile,
     getRecord,
     getSettings,
+    getStore,
+    getTournament,
+    getWallet,
     initHome,
     installControls,
     markPlayed,
     renderAchievements,
+    renderDailyMissions,
+    renderProfile,
     renderRecords,
+    renderStore,
+    renderTournament,
     saveSettings,
+    saveProfile,
+    startTournament,
     setRecord,
+    storeItems,
     sound,
+    tournamentNextUrl,
     unlock
   };
 })();
