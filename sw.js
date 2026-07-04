@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dudugames-v13';
+const CACHE_NAME = 'dudugames-v14';
 const ASSETS = [
   './',
   './index.html',
@@ -35,7 +35,32 @@ const ASSETS = [
   './flappy/',
   './flappy/index.html',
   './breakout/',
-  './breakout/index.html'
+  './breakout/index.html',
+  './quick-games.js',
+  './dino/',
+  './dino/index.html',
+  './labirinto/',
+  './labirinto/index.html',
+  './bolha/',
+  './bolha/index.html',
+  './whack/',
+  './whack/index.html',
+  './quiz/',
+  './quiz/index.html',
+  './genius2/',
+  './genius2/index.html',
+  './memoria-temas/',
+  './memoria-temas/index.html',
+  './pacman/',
+  './pacman/index.html',
+  './xadrez/',
+  './xadrez/index.html',
+  './paciencia/',
+  './paciencia/index.html',
+  './freecell/',
+  './freecell/index.html',
+  './spider/',
+  './spider/index.html'
 ];
 
 self.addEventListener('install', event => {

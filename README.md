@@ -20,6 +20,18 @@ Joguinhos do Dudu para passar o tempo — todos em HTML puro, sem dependências.
 | 🚀 Golfe Cósmico | https://eduardoforville-hue.github.io/dudugames/golfe/ |
 | 🐤 Flappy Dudu | https://eduardoforville-hue.github.io/dudugames/flappy/ |
 | 🧱 Breakout Dudu | https://eduardoforville-hue.github.io/dudugames/breakout/ |
+| 🦖 Dino Runner | https://eduardoforville-hue.github.io/dudugames/dino/ |
+| 🧭 Labirinto | https://eduardoforville-hue.github.io/dudugames/labirinto/ |
+| 🫧 Bolha Pop | https://eduardoforville-hue.github.io/dudugames/bolha/ |
+| 🎯 Whack-a-Mole | https://eduardoforville-hue.github.io/dudugames/whack/ |
+| ⚡ Quiz Relâmpago | https://eduardoforville-hue.github.io/dudugames/quiz/ |
+| 🌈 Genius 2.0 | https://eduardoforville-hue.github.io/dudugames/genius2/ |
+| 🎨 Memória com Temas | https://eduardoforville-hue.github.io/dudugames/memoria-temas/ |
+| 🟡 Pac-Man Simples | https://eduardoforville-hue.github.io/dudugames/pacman/ |
+| ♟️ Xadrez | https://eduardoforville-hue.github.io/dudugames/xadrez/ |
+| 🂡 Paciência | https://eduardoforville-hue.github.io/dudugames/paciencia/ |
+| 🃏 FreeCell | https://eduardoforville-hue.github.io/dudugames/freecell/ |
+| 🕷️ Spider | https://eduardoforville-hue.github.io/dudugames/spider/ |
 
 ## Funcionalidades
 

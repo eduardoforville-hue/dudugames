@@ -21,7 +21,19 @@
     invaders: { label: 'Invaders', key: 'dudu-invaders-recorde', unit: 'pts', better: 'higher' },
     golfe: { label: 'Golfe Cósmico', key: 'dudu-golfe-recorde', unit: 'tacadas', better: 'lower' },
     flappy: { label: 'Flappy Dudu', key: 'dudu-flappy-recorde', unit: 'pts', better: 'higher' },
-    breakout: { label: 'Breakout Dudu', key: 'dudu-breakout-recorde', unit: 'pts', better: 'higher' }
+    breakout: { label: 'Breakout Dudu', key: 'dudu-breakout-recorde', unit: 'pts', better: 'higher' },
+    dino: { label: 'Dino Runner', key: 'dudu-dino-recorde', unit: 'm', better: 'higher' },
+    labirinto: { label: 'Labirinto', key: 'dudu-labirinto-recorde', unit: 'fases', better: 'higher' },
+    bolha: { label: 'Bolha Pop', key: 'dudu-bolha-recorde', unit: 'pts', better: 'higher' },
+    whack: { label: 'Whack-a-Mole', key: 'dudu-whack-recorde', unit: 'pts', better: 'higher' },
+    quiz: { label: 'Quiz Relâmpago', key: 'dudu-quiz-recorde', unit: 'acertos', better: 'higher' },
+    genius2: { label: 'Genius 2.0', key: 'dudu-genius2-recorde', unit: 'fase', better: 'higher' },
+    'memoria-temas': { label: 'Memória Temas', key: 'dudu-memoria-temas-recorde', unit: 'jogadas', better: 'lower' },
+    pacman: { label: 'Pac-Man', key: 'dudu-pacman-recorde', unit: 'pts', better: 'higher' },
+    xadrez: { label: 'Xadrez', key: 'dudu-xadrez-recorde', unit: 'capturas', better: 'higher' },
+    paciencia: { label: 'Paciência', key: 'dudu-paciencia-recorde', unit: 'mov.', better: 'lower' },
+    freecell: { label: 'FreeCell', key: 'dudu-freecell-recorde', unit: 'mov.', better: 'lower' },
+    spider: { label: 'Spider', key: 'dudu-spider-recorde', unit: 'mov.', better: 'lower' }
   };
 
   const achievements = [
@@ -43,6 +55,17 @@
     { id: 'flappy-25', title: 'Voo longo', desc: 'Fez 25 pontos no Flappy Dudu.' },
     { id: 'breakout-50', title: 'Parede rachada', desc: 'Fez 50 pontos no Breakout Dudu.' },
     { id: 'breakout-clear', title: 'Tela limpa', desc: 'Limpou uma fase do Breakout Dudu.' },
+    { id: 'dino-100', title: 'Corredor jurássico', desc: 'Correu 100m no Dino Runner.' },
+    { id: 'labirinto-5', title: 'Sem se perder', desc: 'Venceu 5 fases do Labirinto.' },
+    { id: 'bolha-30', title: 'Estoura tudo', desc: 'Fez 30 pontos no Bolha Pop.' },
+    { id: 'whack-30', title: 'Mira rápida', desc: 'Fez 30 pontos no Whack-a-Mole.' },
+    { id: 'quiz-perfect', title: 'Resposta na ponta', desc: 'Gabaritou o Quiz Relâmpago.' },
+    { id: 'genius-8', title: 'Memória elétrica', desc: 'Chegou à fase 8 no Genius 2.0.' },
+    { id: 'memoria-temas-win', title: 'Tema dominado', desc: 'Venceu a Memória com Temas.' },
+    { id: 'pacman-clear', title: 'Labirinto limpo', desc: 'Comeu todos os pontos no Pac-Man.' },
+    { id: 'klondike-win', title: 'Paciência completa', desc: 'Terminou uma partida de Paciência.' },
+    { id: 'freecell-win', title: 'Células livres', desc: 'Terminou uma partida de FreeCell.' },
+    { id: 'spider-run', title: 'Sequência tecida', desc: 'Fechou uma sequência no Spider.' },
     { id: 'all-games', title: 'Tour completo', desc: 'Jogou todos os jogos.' }
   ];
 
