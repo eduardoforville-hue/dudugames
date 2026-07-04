@@ -31,6 +31,16 @@ Joguinhos do Dudu para passar o tempo — todos em HTML puro, sem dependências.
 | 🂡 Paciência | https://eduardoforville-hue.github.io/dudugames/paciencia/ |
 | 🃏 FreeCell | https://eduardoforville-hue.github.io/dudugames/freecell/ |
 | 🕷️ Spider | https://eduardoforville-hue.github.io/dudugames/spider/ |
+| ⚽ Pênaltis Dudu | https://eduardoforville-hue.github.io/dudugames/penaltis/ |
+| 🦶 Embaixadinhas | https://eduardoforville-hue.github.io/dudugames/embaixadinhas/ |
+| 🎯 Falta Perfeita | https://eduardoforville-hue.github.io/dudugames/falta-perfeita/ |
+| 🥅 Mini Futebol 1x1 | https://eduardoforville-hue.github.io/dudugames/mini-futebol/ |
+| 🧠 Cabeçada na Área | https://eduardoforville-hue.github.io/dudugames/cabecada/ |
+| 🧤 Goleiro Dudu | https://eduardoforville-hue.github.io/dudugames/goleiro/ |
+| 🏃 Drible Run | https://eduardoforville-hue.github.io/dudugames/drible-run/ |
+| 🎯 Chute ao Alvo | https://eduardoforville-hue.github.io/dudugames/chute-alvo/ |
+| 🏆 Copa Dudu | https://eduardoforville-hue.github.io/dudugames/copa-dudu/ |
+| 🔵 Futebol de Botão | https://eduardoforville-hue.github.io/dudugames/futebol-botao/ |
 
 ## Funcionalidades
 

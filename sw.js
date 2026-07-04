@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dudugames-v18';
+const CACHE_NAME = 'dudugames-v19';
 const ASSETS = [
   './',
   './index.html',
@@ -37,6 +37,7 @@ const ASSETS = [
   './breakout/',
   './breakout/index.html',
   './quick-games.js',
+  './football-games.js',
   './dino/',
   './dino/index.html',
   './labirinto/',
@@ -58,7 +59,27 @@ const ASSETS = [
   './freecell/',
   './freecell/index.html',
   './spider/',
-  './spider/index.html'
+  './spider/index.html',
+  './penaltis/',
+  './penaltis/index.html',
+  './embaixadinhas/',
+  './embaixadinhas/index.html',
+  './falta-perfeita/',
+  './falta-perfeita/index.html',
+  './mini-futebol/',
+  './mini-futebol/index.html',
+  './cabecada/',
+  './cabecada/index.html',
+  './goleiro/',
+  './goleiro/index.html',
+  './drible-run/',
+  './drible-run/index.html',
+  './chute-alvo/',
+  './chute-alvo/index.html',
+  './copa-dudu/',
+  './copa-dudu/index.html',
+  './futebol-botao/',
+  './futebol-botao/index.html'
 ];
 
 self.addEventListener('install', event => {

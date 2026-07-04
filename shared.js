@@ -37,7 +37,17 @@
     xadrez: { label: 'Xadrez', key: 'dudu-xadrez-recorde', unit: 'capturas', better: 'higher' },
     paciencia: { label: 'Paciência', key: 'dudu-paciencia-recorde', unit: 'mov.', better: 'lower' },
     freecell: { label: 'FreeCell', key: 'dudu-freecell-recorde', unit: 'mov.', better: 'lower' },
-    spider: { label: 'Spider', key: 'dudu-spider-recorde', unit: 'mov.', better: 'lower' }
+    spider: { label: 'Spider', key: 'dudu-spider-recorde', unit: 'mov.', better: 'lower' },
+    penaltis: { label: 'Pênaltis Dudu', key: 'dudu-penaltis-recorde', unit: 'gols', better: 'higher' },
+    embaixadinhas: { label: 'Embaixadinhas', key: 'dudu-embaixadinhas-recorde', unit: 'toques', better: 'higher' },
+    'falta-perfeita': { label: 'Falta Perfeita', key: 'dudu-falta-recorde', unit: 'pts', better: 'higher' },
+    'mini-futebol': { label: 'Mini Futebol', key: 'dudu-mini-futebol-recorde', unit: 'gols', better: 'higher' },
+    cabecada: { label: 'Cabeçada', key: 'dudu-cabecada-recorde', unit: 'pts', better: 'higher' },
+    goleiro: { label: 'Goleiro Dudu', key: 'dudu-goleiro-recorde', unit: 'defesas', better: 'higher' },
+    'drible-run': { label: 'Drible Run', key: 'dudu-drible-recorde', unit: 'm', better: 'higher' },
+    'chute-alvo': { label: 'Chute ao Alvo', key: 'dudu-alvo-recorde', unit: 'pts', better: 'higher' },
+    'copa-dudu': { label: 'Copa Dudu', key: 'dudu-copa-recorde', unit: 'pts', better: 'higher' },
+    'futebol-botao': { label: 'Futebol de Botão', key: 'dudu-botao-recorde', unit: 'gols', better: 'higher' }
   };
 
   const achievements = [
@@ -71,6 +81,16 @@
     { id: 'freecell-win', title: 'Células livres', desc: 'Terminou uma partida de FreeCell.' },
     { id: 'spider-run', title: 'Sequência tecida', desc: 'Fechou uma sequência no Spider.' },
     { id: 'spider-win', title: 'Teia completa', desc: 'Terminou uma partida de Spider.' },
+    { id: 'penaltis-5', title: 'Frio no pênalti', desc: 'Marcou 5 gols em Pênaltis Dudu.' },
+    { id: 'embaixadinhas-50', title: 'Bola no pé', desc: 'Fez 50 embaixadinhas.' },
+    { id: 'falta-50', title: 'Cobrança perfeita', desc: 'Fez 50 pontos em Falta Perfeita.' },
+    { id: 'mini-futebol-3', title: 'Artilheiro 1x1', desc: 'Fez 3 gols no Mini Futebol.' },
+    { id: 'cabecada-40', title: 'Cabeça certeira', desc: 'Fez 40 pontos em Cabeçada.' },
+    { id: 'goleiro-10', title: 'Muralha Dudu', desc: 'Fez 10 defesas como goleiro.' },
+    { id: 'drible-120', title: 'Driblador veloz', desc: 'Correu 120m no Drible Run.' },
+    { id: 'alvo-120', title: 'Mira calibrada', desc: 'Fez 120 pontos no Chute ao Alvo.' },
+    { id: 'copa-win', title: 'Campeão da Copa', desc: 'Terminou a Copa Dudu.' },
+    { id: 'botao-3', title: 'Craque de botão', desc: 'Fez 3 gols no Futebol de Botão.' },
     { id: 'daily-first', title: 'Missão cumprida', desc: 'Concluiu uma missão diária.' },
     { id: 'tournament-finish', title: 'Mini-campeão', desc: 'Terminou um torneio de 5 jogos.' },
     { id: 'all-games', title: 'Tour completo', desc: 'Jogou todos os jogos.' }
@@ -101,10 +121,20 @@
     xadrez: 'xadrez/',
     paciencia: 'paciencia/',
     freecell: 'freecell/',
-    spider: 'spider/'
+    spider: 'spider/',
+    penaltis: 'penaltis/',
+    embaixadinhas: 'embaixadinhas/',
+    'falta-perfeita': 'falta-perfeita/',
+    'mini-futebol': 'mini-futebol/',
+    cabecada: 'cabecada/',
+    goleiro: 'goleiro/',
+    'drible-run': 'drible-run/',
+    'chute-alvo': 'chute-alvo/',
+    'copa-dudu': 'copa-dudu/',
+    'futebol-botao': 'futebol-botao/'
   };
 
-  const tournamentGames = ['snake', 'pong', 'dino', 'breakout', 'labirinto', 'bolha', 'whack', 'genius2', 'pacman', 'tetris'];
+  const tournamentGames = ['snake', 'pong', 'dino', 'breakout', 'labirinto', 'bolha', 'whack', 'genius2', 'pacman', 'tetris', 'penaltis', 'embaixadinhas', 'goleiro', 'chute-alvo'];
 
   const storeItems = [
     { id: 'theme-ocean', type: 'theme', title: 'Tema Oceano', desc: 'Azul, verde e fundo profundo.', price: 30 },
