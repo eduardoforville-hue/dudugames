@@ -25,9 +25,16 @@
     font-size: 14px;
   }
   .back:hover { color: #4ade80; }
+  .by {
+    font-size: 11px;
+    color: #64748b;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin: 2px 0 12px;
+  }
   h1 {
     font-size: 28px;
-    margin-bottom: 10px;
+    margin-bottom: 2px;
     letter-spacing: 1px;
     background: linear-gradient(90deg, #4ade80, #22d3ee);
     -webkit-background-clip: text;
@@ -37,7 +44,7 @@
   .hud {
     display: flex;
     justify-content: space-between;
-    width: 362px;
+    width: min(362px, calc(100vw - 32px));
     margin: 0 auto 12px;
     font-size: 14px;
     color: #9fb0c3;
@@ -95,6 +102,7 @@
   #ov-msg { font-size: 15px; color: #9fb0c3; max-width: 280px; line-height: 1.6; }
   .btn {
     padding: 10px 22px;
+    touch-action: manipulation;
     font-size: 15px;
     border: 1px solid rgba(74, 222, 128, .45);
     border-radius: 10px;
@@ -113,6 +121,7 @@
 <div class="wrap">
   <a class="back" href="../">← DuduGames</a>
   <h1>🔢 2048</h1>
+  <div class="by">by DuduGames</div>
   <div class="hud">
     <span>Pontos: <b id="score">0</b></span>
     <span>Recorde: <b id="best">0</b></span>
@@ -132,7 +141,8 @@
 </div>
 <script>
 (() => {
-  const SIZE = 4, CELL = 78, GAP = 10;
+  const SIZE = 4, GAP = 10, BASE_CELL = 78;
+  let CELL = BASE_CELL;
   const HS_KEY = 'dudu-2048-recorde';
   const storage = {
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -160,17 +170,39 @@
   let best = +storage.get(HS_KEY) || 0;
   bestEl.textContent = best;
 
+  const bgCells = [];
   for (let x = 0; x < SIZE; x++)
     for (let y = 0; y < SIZE; y++) {
       const c = document.createElement('div');
       c.className = 'bgcell';
       c.style.transform = pos(x, y);
       board.appendChild(c);
+      bgCells.push({ el: c, x, y });
     }
 
   function pos(x, y) {
     return 'translate(' + (GAP + x * (CELL + GAP)) + 'px,' + (GAP + y * (CELL + GAP)) + 'px)';
   }
+
+  function layout() {
+    const avail = Math.min(document.documentElement.clientWidth - 32, SIZE * BASE_CELL + (SIZE + 1) * GAP);
+    CELL = Math.floor((avail - (SIZE + 1) * GAP) / SIZE);
+    const size = SIZE * CELL + (SIZE + 1) * GAP;
+    board.style.width = size + 'px';
+    board.style.height = size + 'px';
+    for (const c of bgCells) {
+      c.el.style.width = CELL + 'px';
+      c.el.style.height = CELL + 'px';
+      c.el.style.transform = pos(c.x, c.y);
+    }
+    for (const t of tiles) {
+      t.el.style.width = CELL + 'px';
+      t.el.style.height = CELL + 'px';
+      t.el.style.transform = pos(t.x, t.y);
+      paint(t);
+    }
+  }
+  window.addEventListener('resize', layout);
 
   function tileAt(x, y) {
     return tiles.find(t => t.x === x && t.y === y);
@@ -178,9 +210,10 @@
 
   function paint(t) {
     const [bg, fg] = COLORS[Math.min(t.v, 2048)] || ['#22d3ee', '#083344'];
+    const f = CELL / BASE_CELL;
     t.el.style.background = bg;
     t.el.style.color = fg;
-    t.el.style.fontSize = t.v < 100 ? '32px' : t.v < 1000 ? '26px' : '21px';
+    t.el.style.fontSize = Math.round((t.v < 100 ? 32 : t.v < 1000 ? 26 : 21) * f) + 'px';
     t.el.textContent = t.v;
   }
 
@@ -194,6 +227,8 @@
     const t = { id: nextId++, x, y, v: Math.random() < 0.9 ? 2 : 4 };
     t.el = document.createElement('div');
     t.el.className = 'tile pop';
+    t.el.style.width = CELL + 'px';
+    t.el.style.height = CELL + 'px';
     t.el.style.transform = pos(x, y);
     paint(t);
     board.appendChild(t.el);
@@ -327,6 +362,7 @@
 
   document.getElementById('restart').addEventListener('click', reset);
   ovBtn.onclick = reset;
+  layout();
   reset();
 })();
 </script>

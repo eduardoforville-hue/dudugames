@@ -25,9 +25,16 @@
     font-size: 14px;
   }
   .back:hover { color: #4ade80; }
+  .by {
+    font-size: 11px;
+    color: #64748b;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin: 2px 0 12px;
+  }
   h1 {
     font-size: 28px;
-    margin-bottom: 10px;
+    margin-bottom: 2px;
     letter-spacing: 1px;
     background: linear-gradient(90deg, #4ade80, #22d3ee);
     -webkit-background-clip: text;
@@ -37,7 +44,7 @@
   .hud {
     display: flex;
     justify-content: space-between;
-    max-width: 356px;
+    width: min(350px, calc(80vw + 30px));
     margin: 0 auto 12px;
     font-size: 14px;
     color: #9fb0c3;
@@ -46,8 +53,8 @@
   .stage { position: relative; display: inline-block; }
   .grid {
     display: grid;
-    grid-template-columns: repeat(4, 80px);
-    grid-template-rows: repeat(4, 80px);
+    grid-template-columns: repeat(4, min(80px, 20vw));
+    grid-template-rows: repeat(4, min(80px, 20vw));
     gap: 10px;
   }
   .card {
@@ -56,6 +63,7 @@
     border: none;
     cursor: pointer;
     padding: 0;
+    touch-action: manipulation;
   }
   .inner {
     width: 100%;
@@ -79,14 +87,14 @@
     background: rgba(255,255,255,.07);
     border: 1px solid rgba(255,255,255,.1);
     color: #4ade80;
-    font-size: 24px;
+    font-size: clamp(16px, 6vw, 24px);
   }
   .card:hover .front { background: rgba(255,255,255,.12); }
   .backface {
     background: rgba(74, 222, 128, .14);
     border: 1px solid rgba(74, 222, 128, .3);
     transform: rotateY(180deg);
-    font-size: 38px;
+    font-size: clamp(26px, 9vw, 38px);
   }
   .card.matched .backface {
     background: rgba(74, 222, 128, .3);
@@ -111,6 +119,7 @@
   .btn {
     margin-top: 14px;
     padding: 10px 22px;
+    touch-action: manipulation;
     font-size: 15px;
     border: none;
     border-radius: 10px;
@@ -129,6 +138,7 @@
 <div class="wrap">
   <a class="back" href="../">← DuduGames</a>
   <h1>🧠 Jogo da Memória</h1>
+  <div class="by">by DuduGames</div>
   <div class="hud">
     <span>Jogadas: <b id="moves">0</b></span>
     <span>Tempo: <b id="time">0:00</b></span>
