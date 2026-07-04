@@ -17,6 +17,7 @@ Joguinhos do Dudu para passar o tempo — todos em HTML puro, sem dependências.
 | 🔤 Forca | https://eduardoforville-hue.github.io/dudugames/forca/ |
 | 🔢 Sudoku Mini | https://eduardoforville-hue.github.io/dudugames/sudoku/ |
 | 👾 Space Invaders | https://eduardoforville-hue.github.io/dudugames/space-invaders/ |
+| 🚀 Golfe Cósmico | https://eduardoforville-hue.github.io/dudugames/golfe/ |
 
 ## Funcionalidades
 

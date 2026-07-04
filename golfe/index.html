@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#16213e">
+<title>🚀 Golfe Cósmico · DuduGames</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 12px;
+  }
+  .stage {
+    position: relative;
+    display: inline-block;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06);
+  }
+  canvas { display: block; max-width: calc(100vw - 24px); height: auto; touch-action: none; }
+  #overlay {
+    position: absolute;
+    inset: 0;
+    backdrop-filter: blur(3px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 20px;
+    transition: opacity .25s;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  #ov-title { font-size: 26px; font-weight: 700; }
+  #ov-msg { font-size: 14px; max-width: 300px; line-height: 1.7; }
+  #overlay .btn { margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="game-wrap">
+  <a class="back" href="../">← DuduGames</a>
+  <h1 class="game-title">🚀 Golfe Cósmico</h1>
+  <div class="by">by DuduGames</div>
+  <div class="game-hud">
+    <span id="hud-hole">Buraco <b>1</b>/9 · Par <b>2</b></span>
+    <span id="hud-stars">⭐ <b>0</b></span>
+    <span id="hud-score">Tacadas: <b>0</b> · Total: <b>0</b></span>
+  </div>
+  <div class="stage">
+    <canvas id="game" width="420" height="540"></canvas>
+    <div id="overlay" class="hidden">
+      <div id="ov-title"></div>
+      <div id="ov-msg"></div>
+      <button class="btn" id="ov-copy">📋 Copiar resultado</button>
+      <button class="btn" id="ov-again">Jogar o campo de novo</button>
+    </div>
+  </div>
+  <div class="game-actions">
+    <button class="btn" id="reset">🔄 Recomeçar campo</button>
+  </div>
+  <p class="game-message">Arraste a partir da bolinha para mirar e solte para lançar — a gravidade dos planetas curva a tacada. Campo novo todo dia!</p>
+</div>
+<script src="../shared.js"></script>
+<script>
+(() => {
+  const dg = window.DuduGames;
+  const W = 420, H = 540;
+  const G = 0.32, DRAG = 0.996, STOP_SPEED = 0.15;
+  const MAX_PULL = 150, MAX_SPEED = 5.2;
+  const FORGIVENESS = {
+    easy:   { maxStrokes: 9, snapR: 20, snapSpeed: 1.4 },
+    normal: { maxStrokes: 7, snapR: 16, snapSpeed: 1.1 },
+    hard:   { maxStrokes: 5, snapR: 12, snapSpeed: 0.8 }
+  };
+  let forgive = FORGIVENESS[dg.getDifficulty()] || FORGIVENESS.normal;
+  const cv = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  const storage = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} }
+  };
+
+  dg.installControls({ difficulty: true, onDifficultyChange: v => { forgive = FORGIVENESS[v] || FORGIVENESS.normal; } });
+
+  const hudHole = document.getElementById('hud-hole');
+  const hudStars = document.getElementById('hud-stars');
+  const hudScore = document.getElementById('hud-score');
+  const overlay = document.getElementById('overlay');
+  const ovTitle = document.getElementById('ov-title');
+  const ovMsg = document.getElementById('ov-msg');
+  const ovCopy = document.getElementById('ov-copy');
+  const ovAgain = document.getElementById('ov-again');
+
+  // ---------- campo diário determinístico ----------
+  const today = new Date();
+  const dateStr = String(today.getDate()).padStart(2, '0') + '/' +
+                  String(today.getMonth() + 1).padStart(2, '0');
+  const dateKey = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+  const HS_KEY = 'dudu-golf-' + dateKey;
+
+  function mulberry32(seed) {
+    return function() {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  let seed = 0;
+  for (const c of dateKey) seed = (seed * 31 + c.charCodeAt(0)) | 0;
+  const rng = mulberry32(seed);
+
+  const PALETTE = ['#f472b6', '#fb923c', '#38bdf8', '#a78bfa', '#34d399'];
+  const bgStars = [];
+  for (let i = 0; i < 90; i++)
+    bgStars.push({ x: rng() * W, y: rng() * H, r: rng() * 1.4 + 0.3, a: rng() * 0.5 + 0.15 });
+
+  function genHole(idx) {
+    const nPlanets = idx < 3 ? 1 + Math.floor(rng() * 2)
+                   : idx < 6 ? 2 + Math.floor(rng() * 2)
+                   : 3 + Math.floor(rng() * 2);
+    const ball = { x: 40 + rng() * 50, y: 70 + rng() * (H - 140) };
+    const hole = { x: W - 45 - rng() * 45, y: 70 + rng() * (H - 140), r: 15 };
+    const planets = [];
+    let guard = 0;
+    while (planets.length < nPlanets && guard++ < 300) {
+      const r = 16 + rng() * 26;
+      const p = { x: 130 + rng() * (W - 260), y: 55 + rng() * (H - 110), r,
+                  color: PALETTE[Math.floor(rng() * PALETTE.length)] };
+      const okBall = Math.hypot(p.x - ball.x, p.y - ball.y) > r + 60;
+      const okHole = Math.hypot(p.x - hole.x, p.y - hole.y) > r + 55;
+      const okOthers = planets.every(q => Math.hypot(p.x - q.x, p.y - q.y) > r + q.r + 22);
+      if (okBall && okHole && okOthers) planets.push(p);
+    }
+    let star = null;
+    guard = 0;
+    while (!star && guard++ < 200) {
+      const s = { x: 120 + rng() * (W - 240), y: 50 + rng() * (H - 100), r: 11 };
+      if (planets.every(p => Math.hypot(s.x - p.x, s.y - p.y) > p.r + 24) &&
+          Math.hypot(s.x - ball.x, s.y - ball.y) > 50 &&
+          Math.hypot(s.x - hole.x, s.y - hole.y) > 40) star = s;
+    }
+    return { ball, hole, planets, star, par: nPlanets >= 3 ? 3 : 2 };
+  }
+  const holes = [];
+  for (let i = 0; i < 9; i++) holes.push(genHole(i));
+  const coursePar = holes.reduce((s, h) => s + h.par, 0);
+
+  // ---------- som sintetizado ----------
+  let audio = null;
+  function beep(freq, dur, type, vol, sweep) {
+    if (dg.getSettings().muted) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = type || 'sine';
+      o.frequency.setValueAtTime(freq, audio.currentTime);
+      if (sweep) o.frequency.exponentialRampToValueAtTime(sweep, audio.currentTime + dur);
+      g.gain.setValueAtTime(vol || 0.12, audio.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + dur);
+      o.connect(g).connect(audio.destination);
+      o.start();
+      o.stop(audio.currentTime + dur);
+    } catch {}
+  }
+  const sfx = {
+    launch: () => beep(220, 0.25, 'triangle', 0.14, 660),
+    bounce: () => beep(110, 0.15, 'square', 0.09, 70),
+    star:   () => { beep(880, 0.12, 'sine', 0.12); setTimeout(() => beep(1320, 0.18, 'sine', 0.12), 90); },
+    hole:   () => [440, 554, 659, 880].forEach((f, i) => setTimeout(() => beep(f, 0.22, 'triangle', 0.11), i * 100)),
+    lost:   () => beep(160, 0.4, 'sawtooth', 0.07, 60)
+  };
+
+  // ---------- estado ----------
+  let holeIdx, strokes, total, starsGot, starTaken;
+  let ball, vel, flying, sinking, sinkT, shotStart, slowTicks, flightTicks;
+  let aiming = false, aimX = 0, aimY = 0, pointerId = null;
+  let msg = '', msgT = 0;
+  let advancing = false;
+  let particles = [];
+  let trail = [];
+  let bestToday = +storage.get(HS_KEY) || 0;
+  let done = false;
+
+  function loadHole(i) {
+    holeIdx = i;
+    const h = holes[i];
+    ball = { x: h.ball.x, y: h.ball.y };
+    vel = { x: 0, y: 0 };
+    strokes = 0;
+    starTaken = false;
+    flying = false; sinking = false; advancing = false;
+    trail = [];
+    msg = 'Buraco ' + (i + 1) + ' · Par ' + h.par;
+    msgT = 110;
+    updateHud();
+  }
+
+  function updateHud() {
+    hudHole.innerHTML = 'Buraco <b>' + (holeIdx + 1) + '</b>/9 · Par <b>' + holes[holeIdx].par + '</b>';
+    hudStars.innerHTML = '⭐ <b>' + starsGot + '</b>';
+    hudScore.innerHTML = 'Tacadas: <b>' + strokes + '</b> · Total: <b>' + total + '</b>';
+  }
+
+  function startCourse() {
+    total = 0; starsGot = 0; done = false;
+    overlay.classList.add('hidden');
+    loadHole(0);
+  }
+
+  function accel(x, y) {
+    let ax = 0, ay = 0;
+    const h = holes[holeIdx];
+    for (const p of h.planets) {
+      const dx = p.x - x, dy = p.y - y;
+      const d2 = Math.max(dx * dx + dy * dy, (p.r + 5) * (p.r + 5));
+      const d = Math.sqrt(d2);
+      const f = G * p.r * p.r / d2;
+      ax += f * dx / d; ay += f * dy / d;
+    }
+    const dx = h.hole.x - x, dy = h.hole.y - y;
+    const d2 = Math.max(dx * dx + dy * dy, 100);
+    const d = Math.sqrt(d2);
+    const f = G * 500 / d2;
+    ax += f * dx / d; ay += f * dy / d;
+    return { ax, ay };
+  }
+
+  function burst(x, y, color, n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, s = Math.random() * 2.4 + 0.6;
+      particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 45 + Math.random() * 25, color });
+    }
+  }
+
+  function physStep() {
+    const h = holes[holeIdx];
+    const a = accel(ball.x, ball.y);
+    vel.x = (vel.x + a.ax) * DRAG;
+    vel.y = (vel.y + a.ay) * DRAG;
+    ball.x += vel.x;
+    ball.y += vel.y;
+    flightTicks++;
+
+    for (const p of h.planets) {
+      const dx = ball.x - p.x, dy = ball.y - p.y;
+      const d = Math.hypot(dx, dy), min = p.r + 6;
+      if (d < min) {
+        const nx = dx / d, ny = dy / d;
+        const dot = vel.x * nx + vel.y * ny;
+        vel.x = (vel.x - 2 * dot * nx) * 0.55;
+        vel.y = (vel.y - 2 * dot * ny) * 0.55;
+        ball.x = p.x + nx * (min + 0.5);
+        ball.y = p.y + ny * (min + 0.5);
+        sfx.bounce();
+        burst(ball.x, ball.y, p.color, 8);
+      }
+    }
+
+    if (h.star && !starTaken && Math.hypot(ball.x - h.star.x, ball.y - h.star.y) < h.star.r + 7) {
+      starTaken = true;
+      starsGot++;
+      sfx.star();
+      burst(h.star.x, h.star.y, '#fbbf24', 16);
+      updateHud();
+      dg.unlock('golfe-estrela');
+    }
+
+    const holeDist = Math.hypot(ball.x - h.hole.x, ball.y - h.hole.y);
+    if (holeDist < h.hole.r + 2 || (holeDist < h.hole.r + forgive.snapR && Math.hypot(vel.x, vel.y) < forgive.snapSpeed)) {
+      flying = false; sinking = true; sinkT = 0;
+      sfx.hole();
+      burst(h.hole.x, h.hole.y, '#a78bfa', 22);
+      return;
+    }
+
+    if (ball.x < -80 || ball.x > W + 80 || ball.y < -80 || ball.y > H + 80) {
+      flying = false;
+      ball = { x: shotStart.x, y: shotStart.y };
+      vel = { x: 0, y: 0 };
+      trail = [];
+      msg = 'Perdida no espaço! Bola de volta.';
+      msgT = 90;
+      sfx.lost();
+      checkStrokeLimit();
+      return;
+    }
+
+    const sp = Math.hypot(vel.x, vel.y);
+    slowTicks = sp < STOP_SPEED ? slowTicks + 1 : 0;
+    if (slowTicks > 20 || flightTicks > 800) {
+      flying = false;
+      vel = { x: 0, y: 0 };
+      checkStrokeLimit();
+    }
+  }
+
+  function checkStrokeLimit() {
+    if (strokes >= forgive.maxStrokes) {
+      msg = 'Limite de tacadas! Próximo buraco.';
+      msgT = 100;
+      finishHole(forgive.maxStrokes + 1);
+    }
+  }
+
+  function finishHole(score) {
+    if (advancing) return;
+    advancing = true;
+    total = total - strokes + score;
+    strokes = score;
+    updateHud();
+    setTimeout(() => {
+      if (holeIdx < 8) loadHole(holeIdx + 1);
+      else endCourse();
+    }, 900);
+  }
+
+  function endCourse() {
+    done = true;
+    const diff = total - coursePar;
+    const diffTxt = diff === 0 ? 'no par do campo' : diff < 0 ? Math.abs(diff) + ' abaixo do par 🔥' : diff + ' acima do par';
+    const record = !bestToday || total < bestToday;
+    if (record) { bestToday = total; storage.set(HS_KEY, bestToday); }
+    if (diff <= 0) dg.unlock('golfe-par');
+    const allTimeRecord = dg.setRecord('golfe', total);
+    ovTitle.textContent = record ? '🏆 Recorde do dia!' : '🚀 Campo concluído!';
+    ovMsg.textContent = 'Campo de ' + dateStr + ': ' + total + ' tacadas (par ' + coursePar + '), ' + diffTxt +
+      ' · ⭐ ' + starsGot + '/9. Melhor hoje: ' + bestToday +
+      (allTimeRecord ? ' · novo recorde geral!' : '') + '. Amanhã tem campo novo!';
+    overlay.classList.remove('hidden');
+  }
+
+  const difficultyLabels = { easy: 'Fácil', normal: 'Normal', hard: 'Difícil' };
+  ovCopy.addEventListener('click', () => {
+    const diffLabel = difficultyLabels[dg.getDifficulty()] || 'Normal';
+    const text = '🚀 Golfe Cósmico ' + dateStr + ' (' + diffLabel + ') — ' + total + ' tacadas (par ' + coursePar + ') · ⭐' + starsGot + '/9\nJogue o campo de hoje: https://eduardoforville-hue.github.io/dudugames/golfe/';
+    const okMsg = () => { ovCopy.textContent = '✅ Copiado!'; setTimeout(() => ovCopy.textContent = '📋 Copiar resultado', 1600); };
+    try {
+      navigator.clipboard.writeText(text).then(okMsg, () => fallbackCopy(text, okMsg));
+    } catch { fallbackCopy(text, okMsg); }
+  });
+  function fallbackCopy(text, cb) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); cb(); } catch {}
+    ta.remove();
+  }
+
+  ovAgain.addEventListener('click', startCourse);
+  document.getElementById('reset').addEventListener('click', startCourse);
+
+  // ---------- entrada (mouse e toque unificados) ----------
+  function canvasPos(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
+  }
+  cv.addEventListener('pointerdown', e => {
+    if (flying || sinking || done || advancing) return;
+    const p = canvasPos(e);
+    if (Math.hypot(p.x - ball.x, p.y - ball.y) < 55) {
+      aiming = true;
+      pointerId = e.pointerId;
+      aimX = p.x; aimY = p.y;
+      cv.setPointerCapture(e.pointerId);
+    }
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!aiming || e.pointerId !== pointerId) return;
+    const p = canvasPos(e);
+    aimX = p.x; aimY = p.y;
+  });
+  cv.addEventListener('pointerup', e => {
+    if (!aiming || e.pointerId !== pointerId) return;
+    aiming = false;
+    const dx = ball.x - aimX, dy = ball.y - aimY;
+    const pull = Math.min(Math.hypot(dx, dy), MAX_PULL);
+    if (pull < 12) return;
+    const sp = pull / MAX_PULL * MAX_SPEED;
+    const d = Math.hypot(dx, dy);
+    vel = { x: dx / d * sp, y: dy / d * sp };
+    shotStart = { x: ball.x, y: ball.y };
+    strokes++;
+    total++;
+    flying = true;
+    slowTicks = 0; flightTicks = 0;
+    trail = [];
+    sfx.launch();
+    dg.markPlayed('golfe');
+    updateHud();
+  });
+  cv.addEventListener('pointercancel', () => { aiming = false; });
+
+  // ---------- desenho ----------
+  function previewDots() {
+    const dots = [];
+    let px = ball.x, py = ball.y;
+    const dx = ball.x - aimX, dy = ball.y - aimY;
+    const pull = Math.min(Math.hypot(dx, dy), MAX_PULL);
+    if (pull < 12) return dots;
+    const sp = pull / MAX_PULL * MAX_SPEED;
+    const d = Math.hypot(dx, dy);
+    let vx = dx / d * sp, vy = dy / d * sp;
+    const h = holes[holeIdx];
+    for (let i = 0; i < 120; i++) {
+      const a = accel(px, py);
+      vx = (vx + a.ax) * DRAG; vy = (vy + a.ay) * DRAG;
+      px += vx; py += vy;
+      if (h.planets.some(p => Math.hypot(px - p.x, py - p.y) < p.r + 6)) break;
+      if (px < -40 || px > W + 40 || py < -40 || py > H + 40) break;
+      if (i % 7 === 0) dots.push({ x: px, y: py, a: 1 - i / 130 });
+    }
+    return dots;
+  }
+
+  function draw(t) {
+    ctx.fillStyle = '#0b1120';
+    ctx.fillRect(0, 0, W, H);
+    for (const s of bgStars) {
+      ctx.globalAlpha = s.a * (0.7 + 0.3 * Math.sin(t / 900 + s.x));
+      ctx.fillStyle = '#e6edf3';
+      ctx.fillRect(s.x, s.y, s.r, s.r);
+    }
+    ctx.globalAlpha = 1;
+    const h = holes[holeIdx];
+
+    // buraco de minhoca
+    const wob = 1 + 0.08 * Math.sin(t / 300);
+    ctx.save();
+    ctx.shadowColor = '#a78bfa';
+    ctx.shadowBlur = 22;
+    ctx.strokeStyle = '#a78bfa';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(h.hole.x, h.hole.y, h.hole.r * wob, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.4;
+    ctx.beginPath();
+    ctx.arc(h.hole.x, h.hole.y, h.hole.r * wob + 6 + 3 * Math.sin(t / 200), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#151030';
+    ctx.beginPath();
+    ctx.arc(h.hole.x, h.hole.y, h.hole.r * wob - 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // planetas
+    for (const p of h.planets) {
+      ctx.save();
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 18;
+      const grad = ctx.createRadialGradient(p.x - p.r * 0.35, p.y - p.r * 0.35, p.r * 0.15, p.x, p.y, p.r);
+      grad.addColorStop(0, p.color);
+      grad.addColorStop(1, '#111827');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // estrela bônus
+    if (h.star && !starTaken) {
+      ctx.save();
+      ctx.shadowColor = '#fbbf24';
+      ctx.shadowBlur = 14;
+      ctx.font = (20 + 2 * Math.sin(t / 250)) + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('⭐', h.star.x, h.star.y);
+      ctx.restore();
+    }
+
+    // rastro
+    for (let i = 0; i < trail.length; i++) {
+      ctx.globalAlpha = i / trail.length * 0.5;
+      ctx.fillStyle = '#4ade80';
+      ctx.fillRect(trail[i].x - 1.5, trail[i].y - 1.5, 3, 3);
+    }
+    ctx.globalAlpha = 1;
+
+    // partículas
+    particles = particles.filter(p => p.life > 0);
+    for (const p of particles) {
+      p.x += p.vx; p.y += p.vy; p.vx *= 0.97; p.vy *= 0.97; p.life--;
+      ctx.globalAlpha = Math.min(p.life / 40, 1);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
+    }
+    ctx.globalAlpha = 1;
+
+    // mira
+    if (aiming) {
+      const dots = previewDots();
+      ctx.fillStyle = '#e6edf3';
+      for (const d of dots) {
+        ctx.globalAlpha = d.a * 0.8;
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      const pull = Math.min(Math.hypot(ball.x - aimX, ball.y - aimY), MAX_PULL);
+      ctx.strokeStyle = pull > MAX_PULL - 1 ? '#f87171' : '#4ade80';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(ball.x, ball.y);
+      ctx.lineTo(aimX, aimY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // bola
+    if (!sinking || sinkT < 30) {
+      const shrink = sinking ? 1 - sinkT / 30 : 1;
+      const bx = sinking ? ball.x + (h.hole.x - ball.x) * (sinkT / 30) : ball.x;
+      const by = sinking ? ball.y + (h.hole.y - ball.y) * (sinkT / 30) : ball.y;
+      ctx.save();
+      ctx.shadowColor = '#4ade80';
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = '#d1fae5';
+      ctx.beginPath();
+      ctx.arc(bx, by, 7 * shrink, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // mensagem
+    if (msgT > 0) {
+      msgT--;
+      ctx.globalAlpha = Math.min(msgT / 30, 1);
+      ctx.fillStyle = '#e6edf3';
+      ctx.font = '600 20px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(msg, W / 2, 36);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function loop(t) {
+    if (flying) {
+      for (let i = 0; i < 2; i++) {
+        if (!flying) break;
+        physStep();
+        trail.push({ x: ball.x, y: ball.y });
+        if (trail.length > 55) trail.shift();
+      }
+    }
+    if (sinking) {
+      sinkT++;
+      if (sinkT === 30) {
+        sinking = false;
+        finishHole(strokes);
+      }
+    }
+    draw(t);
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('dudu-reset', () => { bestToday = 0; storage.set(HS_KEY, 0); });
+
+  startCourse();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

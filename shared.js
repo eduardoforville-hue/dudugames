@@ -18,7 +18,8 @@
     simon: { label: 'Simon', key: 'dudu-simon-recorde', unit: 'fase', better: 'higher' },
     forca: { label: 'Forca', key: 'dudu-forca-recorde', unit: 'vitórias', better: 'higher' },
     sudoku: { label: 'Sudoku', key: 'dudu-sudoku-recorde', unit: 's', better: 'lower' },
-    invaders: { label: 'Invaders', key: 'dudu-invaders-recorde', unit: 'pts', better: 'higher' }
+    invaders: { label: 'Invaders', key: 'dudu-invaders-recorde', unit: 'pts', better: 'higher' },
+    golfe: { label: 'Golfe Cósmico', key: 'dudu-golfe-recorde', unit: 'tacadas', better: 'lower' }
   };
 
   const achievements = [
@@ -34,6 +35,8 @@
     { id: 'forca-win', title: 'Palavra salva', desc: 'Venceu uma partida de Forca.' },
     { id: 'sudoku-win', title: 'Grade resolvida', desc: 'Terminou o Sudoku mini.' },
     { id: 'invaders-100', title: 'Defensor arcade', desc: 'Fez 100 pontos em Space Invaders.' },
+    { id: 'golfe-estrela', title: 'Colecionador estelar', desc: 'Pegou uma estrela bônus no Golfe Cósmico.' },
+    { id: 'golfe-par', title: 'Tacada de outro planeta', desc: 'Terminou o campo do Golfe Cósmico no par ou abaixo.' },
     { id: 'all-games', title: 'Tour completo', desc: 'Jogou todos os jogos.' }
   ];
 
