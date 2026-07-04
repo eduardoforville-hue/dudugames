@@ -11,10 +11,25 @@
 <style>
   * { box-sizing: border-box; }
   body { min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  .sudoku { display: grid; grid-template-columns: repeat(4, 62px); gap: 6px; padding: 12px; width: fit-content; }
-  .sudoku input { width: 62px; height: 62px; text-align: center; font-size: 28px; }
-  .sudoku input:nth-child(2), .sudoku input:nth-child(6), .sudoku input:nth-child(10), .sudoku input:nth-child(14) { margin-right: 8px; }
-  .sudoku input:nth-child(n+9):nth-child(-n+12) { margin-top: 8px; }
+  .sudoku {
+    --sudoku-cell: clamp(48px, 18vw, 62px);
+    --sudoku-gap: clamp(4px, 1.7vw, 6px);
+    --sudoku-block-gap: clamp(6px, 2vw, 8px);
+    display: grid;
+    grid-template-columns: repeat(4, var(--sudoku-cell));
+    gap: var(--sudoku-gap);
+    padding: clamp(10px, 3vw, 12px);
+    width: fit-content;
+    max-width: 100%;
+  }
+  .sudoku input {
+    width: var(--sudoku-cell);
+    height: var(--sudoku-cell);
+    text-align: center;
+    font-size: clamp(22px, 8vw, 28px);
+  }
+  .sudoku input:nth-child(2), .sudoku input:nth-child(6), .sudoku input:nth-child(10), .sudoku input:nth-child(14) { margin-right: var(--sudoku-block-gap); }
+  .sudoku input:nth-child(n+9):nth-child(-n+12) { margin-top: var(--sudoku-block-gap); }
   .fixed { opacity: .78; }
 </style>
 </head>

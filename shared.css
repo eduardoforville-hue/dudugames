@@ -1,5 +1,6 @@
 html {
   color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
 }
 
 :root {
@@ -34,6 +35,7 @@ html[data-theme="light"] {
 body {
   background: var(--page-bg) !important;
   color: var(--text) !important;
+  overscroll-behavior: contain;
 }
 
 .tagline,
@@ -100,6 +102,7 @@ a.card:hover,
   font-size: 13px;
   cursor: pointer;
   transition: background .15s, border-color .15s, transform .15s;
+  touch-action: manipulation;
 }
 
 .dg-control:active {
@@ -197,6 +200,7 @@ select.dg-control {
 .game-wrap {
   width: min(560px, 100%);
   text-align: center;
+  margin-inline: auto;
 }
 
 .game-wrap.wide {
@@ -221,6 +225,11 @@ select.dg-control {
   gap: 10px;
   margin: 12px auto;
   color: var(--muted);
+}
+
+.game-actions .btn {
+  min-height: 42px;
+  min-width: 44px;
 }
 
 .game-hud b {
@@ -258,6 +267,14 @@ select.dg-control {
   touch-action: manipulation;
 }
 
+.btn,
+.dg-control,
+.game-cell,
+.dpad button {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
 .game-cell:hover {
   background: var(--panel-strong);
 }
@@ -281,10 +298,53 @@ select.dg-control {
     align-items: center;
     flex-direction: column;
     justify-content: flex-start;
+    padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+    min-height: 100svh;
   }
 
   .dg-toast {
-    top: 68px;
-    bottom: auto;
+    top: auto;
+    bottom: 156px;
+  }
+
+  .game-wrap,
+  .game-wrap.wide {
+    width: 100%;
+  }
+
+  .game-title {
+    font-size: clamp(24px, 8vw, 28px);
+  }
+
+  .game-hud,
+  .game-actions {
+    gap: 8px;
+    margin: 10px auto;
+  }
+
+  .dg-control {
+    min-height: 40px;
+    padding: 9px 11px;
+  }
+
+  .game-hud {
+    font-size: 14px;
+  }
+
+  .game-actions .btn,
+  .touch .btn {
+    min-height: 44px;
+    min-width: 50px;
+    padding: 10px 12px;
+  }
+
+  .game-canvas {
+    max-height: min(68svh, 560px);
+    object-fit: contain;
+  }
+
+  .game-message {
+    font-size: 13px;
+    line-height: 1.35;
   }
 }

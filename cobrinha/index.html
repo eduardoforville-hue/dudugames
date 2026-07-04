@@ -50,11 +50,42 @@
     max-width: 420px;
     margin: 0 auto 10px;
     font-size: 15px;
-    color: #9fb0c3;
+    color: var(--muted, #9fb0c3);
   }
   .hud b { color: #4ade80; font-size: 18px; display: inline-block; }
   .hud b.pop { animation: pop .25s ease; }
   @keyframes pop { 50% { transform: scale(1.5); } }
+  .speed-panel {
+    max-width: 420px;
+    margin: 0 auto 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--muted, #9fb0c3);
+    font-size: 13px;
+  }
+  .speed-panel span {
+    width: 100%;
+  }
+  .speed-panel button {
+    min-width: 82px;
+    padding: 8px 10px;
+    border: 1px solid var(--border, rgba(255,255,255,.12));
+    border-radius: 8px;
+    background: var(--panel, rgba(255,255,255,.07));
+    color: var(--text, #e6edf3);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+    touch-action: manipulation;
+  }
+  .speed-panel button.active {
+    border-color: color-mix(in srgb, var(--accent, #4ade80) 55%, transparent);
+    background: color-mix(in srgb, var(--accent, #4ade80) 22%, transparent);
+    color: var(--accent, #4ade80);
+  }
   .stage {
     position: relative;
     display: inline-block;
@@ -105,12 +136,35 @@
   .dpad .down  { grid-column: 2; grid-row: 2; }
   .dpad .right { grid-column: 3; grid-row: 2; }
   .hint-mobile { display: none; }
+  @media (max-width: 420px) {
+    body {
+      padding: 12px;
+      min-height: 100svh;
+      align-items: flex-start;
+    }
+    .wrap { width: 100%; }
+    .stage,
+    canvas {
+      width: min(100%, 420px);
+    }
+    .speed-panel button {
+      min-height: 42px;
+      min-width: 84px;
+    }
+    .dpad {
+      grid-template-columns: repeat(3, 60px);
+      grid-template-rows: repeat(2, 50px);
+    }
+  }
   @media (hover: hover) and (pointer: fine) {
     .dpad { display: none; }
   }
   @media (hover: none), (pointer: coarse) {
     .hint-pc { display: none; }
     .hint-mobile { display: inline; }
+  }
+  @media (max-width: 420px) {
+    .dpad { display: grid; }
   }
 </style>
 <link rel="stylesheet" href="../shared.css">
@@ -123,6 +177,12 @@
   <div class="hud">
     <span>Pontos: <b id="score">0</b></span>
     <span>Recorde: <b id="high">0</b></span>
+  </div>
+  <div class="speed-panel" aria-label="Velocidade da Cobrinha">
+    <span>Velocidade: <b id="speed-label">Normal</b></span>
+    <button type="button" data-speed="easy">Leve</button>
+    <button type="button" data-speed="normal">Normal</button>
+    <button type="button" data-speed="hard">Turbo</button>
   </div>
   <div class="stage">
     <canvas id="game" width="420" height="420"></canvas>
@@ -144,11 +204,11 @@
 (() => {
   const dg = window.DuduGames;
   const levels = {
-    easy: { start: 180, min: 90, dec: 2 },
-    normal: { start: 150, min: 70, dec: 3 },
-    hard: { start: 115, min: 55, dec: 4 }
+    easy: { label: 'Leve', start: 185, min: 95, dec: 2 },
+    normal: { label: 'Normal', start: 150, min: 70, dec: 3 },
+    hard: { label: 'Turbo', start: 110, min: 55, dec: 4 }
   };
-  const level = levels[dg.getDifficulty()] || levels.normal;
+  let level = levels[dg.getDifficulty()] || levels.normal;
   const cv = document.getElementById('game');
   const ctx = cv.getContext('2d');
   const N = 21;
@@ -159,8 +219,38 @@
   const overlay = document.getElementById('overlay');
   const ovTitle = document.getElementById('ov-title');
   const ovMsg = document.getElementById('ov-msg');
+  const speedLabel = document.getElementById('speed-label');
+  const speedButtons = [...document.querySelectorAll('[data-speed]')];
 
-  dg.installControls({ difficulty: true, onDifficultyChange: () => location.reload() });
+  dg.installControls({ difficulty: true, onDifficultyChange: setSpeed });
+
+  function currentSpeed() {
+    return levels[dg.getDifficulty()] ? dg.getDifficulty() : 'normal';
+  }
+
+  function renderSpeed() {
+    const speed = currentSpeed();
+    speedLabel.textContent = levels[speed].label;
+    speedButtons.forEach(button => {
+      button.classList.toggle('active', button.dataset.speed === speed);
+      button.setAttribute('aria-pressed', button.dataset.speed === speed ? 'true' : 'false');
+    });
+    const globalSelect = document.querySelector('.dg-topbar select.dg-control');
+    if (globalSelect) globalSelect.value = speed;
+  }
+
+  function setSpeed(speed) {
+    if (!levels[speed]) return;
+    dg.saveSettings({ difficulty: speed });
+    level = levels[speed];
+    renderSpeed();
+    if (state === 'run') {
+      stepMs = level.start;
+      acc = 0;
+    } else if (state === 'menu' || state === 'over') {
+      stepMs = level.start;
+    }
+  }
 
   let snake, dir, nextDir, food, score, stepMs;
   let state = 'menu'; // menu | run | pause | over
@@ -364,6 +454,10 @@
     });
   });
 
+  speedButtons.forEach(button => {
+    button.addEventListener('click', () => setSpeed(button.dataset.speed));
+  });
+
   // swipe na área do jogo (celular)
   const stageEl = document.querySelector('.stage');
   let tx = null, ty = null;
@@ -383,6 +477,7 @@
   }, { passive: true });
 
   draw();
+  renderSpeed();
   requestAnimationFrame(loop);
 })();
 </script>

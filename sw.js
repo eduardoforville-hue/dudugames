@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dudugames-v7';
+const CACHE_NAME = 'dudugames-v10';
 const ASSETS = [
   './',
   './index.html',

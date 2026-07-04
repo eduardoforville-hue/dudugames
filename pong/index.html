@@ -12,6 +12,8 @@
   * { box-sizing: border-box; }
   body { min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   canvas { max-width: 100%; aspect-ratio: 4 / 3; }
+  .pong-touch { display: flex; justify-content: center; gap: 10px; margin-top: 8px; }
+  .pong-touch button { min-width: 74px; font-size: 20px; }
 </style>
 </head>
 <body>
@@ -22,7 +24,11 @@
   <div class="game-hud"><span>Pontos: <b id="score">0</b></span><span>Recorde: <b id="best">0</b></span></div>
   <canvas id="game" class="game-canvas game-board" width="640" height="420"></canvas>
   <div class="game-actions"><button class="btn" id="start">▶ Jogar</button></div>
-  <p class="game-message">Mouse, toque ou ↑↓ para mover a raquete.</p>
+  <div class="touch pong-touch" aria-label="Controles do Pong">
+    <button class="btn" type="button" data-pong="up">↑</button>
+    <button class="btn" type="button" data-pong="down">↓</button>
+  </div>
+  <p class="game-message">Arraste na tela ou use os botões para mover a raquete.</p>
 </div>
 <script src="../shared.js"></script>
 <script>
@@ -31,7 +37,7 @@
   const cv = document.getElementById('game'), ctx = cv.getContext('2d');
   const scoreEl = document.getElementById('score'), bestEl = document.getElementById('best');
   const speeds = { easy: 4, normal: 5.2, hard: 6.4 };
-  let best = dg.getRecord('pong'), score = 0, running = false, py = 170, aiY = 170, bx = 320, by = 210, vx = 5, vy = 3;
+  let best = dg.getRecord('pong'), score = 0, running = false, py = 170, aiY = 170, bx = 320, by = 210, vx = 5, vy = 3, keys = {};
   bestEl.textContent = best; dg.installControls({ difficulty: true, onDifficultyChange: () => reset(false) });
   function reset(start = true) {
     score = 0; scoreEl.textContent = '0'; py = aiY = 170; bx = 320; by = 210;
@@ -45,6 +51,9 @@
   }
   function step() {
     if (running) {
+      if (keys.up) py -= 6;
+      if (keys.down) py += 6;
+      py = Math.max(0, Math.min(340, py));
       bx += vx; by += vy; aiY += Math.sign(by - (aiY + 40)) * Math.min(Math.abs(by - (aiY + 40)), 4.2);
       aiY = Math.max(0, Math.min(340, aiY));
       if (by < 9 || by > 411) vy *= -1;
@@ -58,7 +67,16 @@
   function setPaddle(y) { py = Math.max(0, Math.min(340, y - 40)); }
   cv.addEventListener('mousemove', e => setPaddle((e.clientY - cv.getBoundingClientRect().top) * cv.height / cv.getBoundingClientRect().height));
   cv.addEventListener('touchmove', e => { setPaddle((e.touches[0].clientY - cv.getBoundingClientRect().top) * cv.height / cv.getBoundingClientRect().height); e.preventDefault(); }, { passive: false });
-  document.addEventListener('keydown', e => { if (e.key === 'ArrowUp') py -= 22; if (e.key === 'ArrowDown') py += 22; py = Math.max(0, Math.min(340, py)); });
+  document.addEventListener('keydown', e => { if (e.key === 'ArrowUp') keys.up = true; if (e.key === 'ArrowDown') keys.down = true; });
+  document.addEventListener('keyup', e => { if (e.key === 'ArrowUp') keys.up = false; if (e.key === 'ArrowDown') keys.down = false; });
+  document.querySelectorAll('[data-pong]').forEach(button => {
+    const key = button.dataset.pong;
+    const release = () => { keys[key] = false; };
+    button.addEventListener('pointerdown', e => { e.preventDefault(); keys[key] = true; });
+    button.addEventListener('pointerup', release);
+    button.addEventListener('pointerleave', release);
+    button.addEventListener('pointercancel', release);
+  });
   document.getElementById('start').addEventListener('click', () => reset(true));
   window.addEventListener('dudu-reset', () => { best = 0; bestEl.textContent = '0'; });
   draw(); step();
