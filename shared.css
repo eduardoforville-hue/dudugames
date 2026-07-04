@@ -823,26 +823,53 @@ select.dg-control {
 
   .cards-area {
     gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding: 0 2px 10px;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
   }
 
-  .cards-table,
-  .cards-8,
-  .cards-10 {
+  .cards-top,
+  .cards-table {
     gap: 5px;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .cards-top {
+    grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+  }
+
+  .cards-table {
+    grid-template-columns: repeat(7, 56px);
+  }
+
+  .cards-8 {
+    grid-template-columns: repeat(8, 54px);
+  }
+
+  .cards-10 {
+    grid-template-columns: repeat(10, 50px);
   }
 
   .playing-card,
   .card-slot {
-    min-height: 48px;
+    min-height: 54px;
+    padding-inline: 3px;
     font-size: 11px;
   }
 
   .playing-card {
-    min-height: 58px;
+    min-height: 68px;
+    box-shadow: 0 5px 12px rgba(0,0,0,.18), inset 0 0 0 1px rgba(15,23,42,.08);
   }
 
   .card-corner {
-    width: 16px;
+    width: 18px;
   }
 
   .card-corner.top {
@@ -856,25 +883,40 @@ select.dg-control {
   }
 
   .card-pips {
-    inset: 16px 9px;
+    inset: 17px 8px;
   }
 
   .pip {
-    width: 14px;
-    height: 14px;
+    width: 15px;
+    height: 15px;
+  }
+
+  .card-rank,
+  .card-suit {
+    font-size: 12px;
+  }
+
+  .card-pip {
+    font-size: 16px;
+  }
+
+  .card-back-mark {
+    width: 28px;
+    height: 28px;
+    font-size: 10px;
   }
 
   .card-stack {
-    min-height: 182px;
+    min-height: 230px;
   }
 
   .card-stack .playing-card + .playing-card {
-    margin-top: -24px;
+    margin-top: -22px;
   }
 
   .card-stack .playing-card.is-down + .playing-card,
   .card-stack .playing-card + .playing-card.is-down {
-    margin-top: -30px;
+    margin-top: -28px;
   }
 }
 
