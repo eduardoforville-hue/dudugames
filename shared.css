@@ -333,23 +333,6 @@ select.dg-control {
   aspect-ratio: 1;
 }
 
-.quiz-box {
-  display: grid;
-  gap: 10px;
-  max-width: 520px;
-  margin: 0 auto;
-}
-
-.quiz-box h2 {
-  margin: 0 0 6px;
-  font-size: clamp(20px, 6vw, 26px);
-}
-
-.quiz-box .btn {
-  min-height: 44px;
-  padding: 10px 12px;
-}
-
 .genius-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(120px, 1fr));

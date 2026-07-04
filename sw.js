@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dudugames-v15';
+const CACHE_NAME = 'dudugames-v16';
 const ASSETS = [
   './',
   './index.html',
@@ -45,8 +45,6 @@ const ASSETS = [
   './bolha/index.html',
   './whack/',
   './whack/index.html',
-  './quiz/',
-  './quiz/index.html',
   './genius2/',
   './genius2/index.html',
   './memoria-temas/',

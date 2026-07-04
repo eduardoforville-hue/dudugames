@@ -60,9 +60,10 @@
     clearRoot();
     const cv = canvas(640, 320), ctx = cv.getContext('2d');
     const speeds = { easy: 4, normal: 5, hard: 6.2 };
+    const groundY = 278;
     let dino, obstacles, frame, score, running, raf;
     function reset() {
-      dino = { x: 74, y: 244, vy: 0, onGround: true };
+      dino = { x: 74, y: 232, w: 50, h: 46, vy: 0, onGround: true };
       obstacles = [];
       frame = 0; score = 0; running = true;
       setScore(0); setAux('0m'); setMsg('Espaço, toque ou ↑ para pular.');
@@ -78,30 +79,145 @@
         frame++;
         const speed = speeds[difficulty()] || speeds.normal;
         dino.vy += .48; dino.y += dino.vy;
-        if (dino.y >= 244) { dino.y = 244; dino.vy = 0; dino.onGround = true; }
-        if (frame % Math.round(82 - speed * 5) === 0) obstacles.push({ x: 660, w: rand(20, 38), h: rand(28, 58) });
+        if (dino.y >= groundY - dino.h) { dino.y = groundY - dino.h; dino.vy = 0; dino.onGround = true; }
+        if (frame % Math.round(82 - speed * 5) === 0) {
+          const kind = Math.random() > .38 ? 'cactus' : 'rock';
+          obstacles.push({ x: 660, w: kind === 'cactus' ? rand(24, 38) : rand(34, 52), h: kind === 'cactus' ? rand(42, 66) : rand(24, 36), kind });
+        }
         obstacles.forEach(o => o.x -= speed);
         obstacles = obstacles.filter(o => o.x > -60);
         score = Math.floor(frame / 6);
         setScore(score); setAux(score + 'm');
         if (score >= 100) dg.unlock('dino-100');
         for (const o of obstacles) {
-          if (dino.x + 28 > o.x && dino.x < o.x + o.w && dino.y + 34 > 276 - o.h) {
+          if (dino.x + 42 > o.x + 5 && dino.x + 7 < o.x + o.w - 3 && dino.y + 42 > groundY - o.h + 5) {
             running = false; saveScore(score); dg.sound('fail'); setMsg('Fim da corrida. Toque para tentar de novo.');
           }
         }
       }
       draw(); raf = requestAnimationFrame(step);
     }
+    function roundedRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
     function draw() {
-      ctx.fillStyle = '#0d1526'; ctx.fillRect(0,0,640,320);
-      ctx.fillStyle = 'rgba(34,211,238,.14)';
-      for (let i = 0; i < 8; i++) ctx.fillRect((i * 100 - frame * 1.4) % 760 - 80, 70 + i % 3 * 38, 46, 8);
-      ctx.fillStyle = '#1f3b2d'; ctx.fillRect(0, 282, 640, 38);
-      ctx.fillStyle = '#4ade80'; ctx.fillRect(dino.x, dino.y, 30, 34);
-      ctx.fillStyle = '#fbbf24'; ctx.fillRect(dino.x + 22, dino.y + 8, 18, 8);
-      ctx.fillStyle = '#fb7185'; obstacles.forEach(o => ctx.fillRect(o.x, 276 - o.h, o.w, o.h));
-      if (!running) { ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(0,120,640,80); ctx.fillStyle = '#e6edf3'; ctx.font = '700 28px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('Fim da corrida', 320, 170); }
+      const sky = ctx.createLinearGradient(0, 0, 0, 320);
+      sky.addColorStop(0, '#15345f');
+      sky.addColorStop(.55, '#17475b');
+      sky.addColorStop(1, '#0d1526');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, 640, 320);
+
+      ctx.fillStyle = 'rgba(255,255,255,.74)';
+      for (let i = 0; i < 9; i++) {
+        const x = (i * 112 - frame * .45) % 760 - 80;
+        const y = 38 + (i % 4) * 30;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 22, 8, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 20, y + 2, 28, 10, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 45, y, 18, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = 'rgba(34,211,238,.18)';
+      for (let i = 0; i < 6; i++) {
+        const x = (i * 160 - frame * .9) % 820 - 120;
+        ctx.beginPath();
+        ctx.moveTo(x, 236);
+        ctx.lineTo(x + 82, 132 + (i % 2) * 18);
+        ctx.lineTo(x + 176, 236);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.fillStyle = '#1f5f40'; ctx.fillRect(0, groundY, 640, 42);
+      ctx.fillStyle = '#2f855a'; ctx.fillRect(0, groundY, 640, 8);
+      ctx.fillStyle = 'rgba(251,191,36,.55)';
+      for (let i = 0; i < 18; i++) {
+        const x = (i * 44 - frame * 2.2) % 720 - 40;
+        ctx.fillRect(x, groundY + 14 + (i % 3) * 7, 18, 3);
+      }
+
+      obstacles.forEach(o => drawObstacle(o));
+      drawDino();
+
+      if (!running) {
+        ctx.fillStyle = 'rgba(3,7,18,.62)';
+        ctx.fillRect(0, 112, 640, 92);
+        ctx.fillStyle = '#e6edf3';
+        ctx.font = '800 30px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Fim da corrida', 320, 158);
+        ctx.font = '600 15px sans-serif';
+        ctx.fillStyle = '#9fb0c3';
+        ctx.fillText('Toque para tentar de novo', 320, 184);
+      }
+    }
+    function drawDino() {
+      const x = dino.x, y = dino.y;
+      const bob = dino.onGround ? Math.sin(frame / 5) * 1.5 : 0;
+      ctx.save();
+      ctx.translate(0, bob);
+      ctx.fillStyle = '#4ade80';
+      roundedRect(x + 7, y + 15, 33, 28, 9); ctx.fill();
+      roundedRect(x + 31, y + 4, 26, 21, 7); ctx.fill();
+      ctx.fillStyle = '#86efac';
+      roundedRect(x + 11, y + 21, 20, 14, 7); ctx.fill();
+      ctx.fillStyle = '#bbf7d0';
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(x + 10 + i * 8, y + 16 - i % 2);
+        ctx.lineTo(x + 14 + i * 8, y + 8);
+        ctx.lineTo(x + 18 + i * 8, y + 16 - i % 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath(); ctx.arc(x + 49, y + 12, 2.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.moveTo(x + 55, y + 17);
+      ctx.lineTo(x + 65, y + 20);
+      ctx.lineTo(x + 55, y + 23);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 7;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x + 12, y + 25); ctx.quadraticCurveTo(x - 10, y + 19, x - 3, y + 42); ctx.stroke();
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 6;
+      const stride = dino.onGround ? Math.sin(frame / 4) * 5 : -2;
+      ctx.beginPath(); ctx.moveTo(x + 18, y + 41); ctx.lineTo(x + 14 + stride, y + 50); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + 32, y + 41); ctx.lineTo(x + 37 - stride, y + 50); ctx.stroke();
+      ctx.fillStyle = '#bbf7d0';
+      ctx.fillRect(x + 13 + stride, y + 49, 12, 4);
+      ctx.fillRect(x + 31 - stride, y + 49, 12, 4);
+      ctx.restore();
+    }
+    function drawObstacle(o) {
+      const base = groundY;
+      if (o.kind === 'rock') {
+        ctx.fillStyle = '#a78bfa';
+        roundedRect(o.x, base - o.h, o.w, o.h, 8); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,.22)';
+        roundedRect(o.x + 7, base - o.h + 7, o.w * .45, 6, 3); ctx.fill();
+        return;
+      }
+      ctx.fillStyle = '#fb7185';
+      roundedRect(o.x + o.w * .32, base - o.h, o.w * .38, o.h, 8); ctx.fill();
+      roundedRect(o.x, base - o.h * .72, o.w * .36, o.h * .38, 8); ctx.fill();
+      roundedRect(o.x + o.w * .58, base - o.h * .62, o.w * .4, o.h * .34, 8); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.2)';
+      ctx.fillRect(o.x + o.w * .45, base - o.h + 8, 3, o.h - 14);
     }
     root.addEventListener('pointerdown', jump);
     document.addEventListener('keydown', onKey);
@@ -220,40 +336,6 @@
     startBtn.onclick = start;
     setMsg(isWhack ? 'Acerte o alvo antes que ele mude de lugar.' : 'Estoure o máximo de bolhas em 30 segundos.');
     start();
-  }
-
-  function runQuiz() {
-    clearRoot();
-    const data = [
-      ['Qual jogo tem blocos caindo?', ['Tetris','Pong','Forca'], 0],
-      ['Quanto vale 2 + 2?', ['3','4','22'], 1],
-      ['Qual peça anda em L no xadrez?', ['Bispo','Cavalo','Torre'], 1],
-      ['Qual planeta é vermelho?', ['Marte','Vênus','Netuno'], 0],
-      ['HTML é usado para...', ['música','páginas web','desenhar no papel'], 1],
-      ['No Campo Minado, bandeira marca...', ['bomba','ponto','tempo'], 0]
-    ];
-    let q = 0, score = 0, deck = shuffle([...data]);
-    const box = document.createElement('div'); box.className = 'quiz-box dg-panel'; root.appendChild(box);
-    function render() {
-      if (q >= deck.length) {
-        box.innerHTML = `<h2>Fim!</h2><p>${score}/${deck.length} corretas.</p>`;
-        saveScore(score); if (score === deck.length) dg.unlock('quiz-perfect'); return;
-      }
-      const [question, answers] = deck[q];
-      box.innerHTML = `<h2>${question}</h2>`;
-      answers.forEach((answer, i) => {
-        const b = button(answer); b.onclick = () => choose(i); box.appendChild(b);
-      });
-      setScore(score); setAux((q + 1) + '/' + deck.length);
-    }
-    function choose(i) {
-      dg.markPlayed(game);
-      if (i === deck[q][2]) { score++; dg.sound('score'); } else dg.sound('fail');
-      q++; render();
-    }
-    startBtn.onclick = () => { q = 0; score = 0; deck = shuffle([...data]); render(); };
-    setMsg('Responda rápido e tente acertar tudo.');
-    render();
   }
 
   function runGenius() {
@@ -1008,7 +1090,6 @@
     labirinto: runLabirinto,
     bolha: () => runPopGame('bolha'),
     whack: () => runPopGame('whack'),
-    quiz: runQuiz,
     genius2: runGenius,
     'memoria-temas': runMemoryThemes,
     pacman: runPacman,
@@ -1018,7 +1099,7 @@
     spider: () => runSolitaire('spider')
   };
 
-  dg.installControls({ difficulty: !['xadrez','freecell','quiz','memoria-temas'].includes(game), onDifficultyChange: () => runners[game]() });
+  dg.installControls({ difficulty: !['xadrez','freecell','memoria-temas'].includes(game), onDifficultyChange: () => runners[game]() });
   window.addEventListener('dudu-reset', () => { best = 0; bestEl.textContent = '-'; });
   runners[game]();
 })();

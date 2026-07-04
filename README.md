@@ -24,7 +24,6 @@ Joguinhos do Dudu para passar o tempo — todos em HTML puro, sem dependências.
 | 🧭 Labirinto | https://eduardoforville-hue.github.io/dudugames/labirinto/ |
 | 🫧 Bolha Pop | https://eduardoforville-hue.github.io/dudugames/bolha/ |
 | 🎯 Whack-a-Mole | https://eduardoforville-hue.github.io/dudugames/whack/ |
-| ⚡ Quiz Relâmpago | https://eduardoforville-hue.github.io/dudugames/quiz/ |
 | 🌈 Genius 2.0 | https://eduardoforville-hue.github.io/dudugames/genius2/ |
 | 🎨 Memória com Temas | https://eduardoforville-hue.github.io/dudugames/memoria-temas/ |
 | 🟡 Pac-Man Simples | https://eduardoforville-hue.github.io/dudugames/pacman/ |
