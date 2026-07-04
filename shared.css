@@ -467,7 +467,7 @@ select.dg-control {
 
 .playing-card,
 .card-slot {
-  min-height: 48px;
+  min-height: 58px;
   padding: 8px 5px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -481,31 +481,148 @@ select.dg-control {
 
 .playing-card {
   position: relative;
-  display: block;
+  display: grid;
+  place-items: center;
   width: 100%;
-  min-height: 54px;
-  background: color-mix(in srgb, var(--panel-strong) 86%, #fff) !important;
-  color: var(--text);
-  box-shadow: 0 8px 18px rgba(0,0,0,.14);
+  aspect-ratio: 5 / 7;
+  min-height: 68px;
+  padding: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.92), rgba(226,232,240,.96)) !important;
+  color: #0f172a !important;
+  box-shadow: 0 8px 18px rgba(0,0,0,.18), inset 0 0 0 1px rgba(15,23,42,.08);
 }
 
 .playing-card.red {
-  color: var(--danger);
+  color: #dc2626 !important;
+}
+
+.playing-card.black {
+  color: #111827 !important;
 }
 
 .playing-card.is-down {
-  color: transparent;
+  color: transparent !important;
   background:
-    linear-gradient(135deg, rgba(34,211,238,.28), rgba(74,222,128,.18)),
-    var(--panel) !important;
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,.28), transparent 18%),
+    linear-gradient(135deg, rgba(34,211,238,.86), rgba(74,222,128,.72)),
+    #0f766e !important;
 }
 
 .playing-card.is-down::after {
   content: "";
   position: absolute;
-  inset: 12px;
-  border: 1px dashed color-mix(in srgb, var(--accent-2) 55%, transparent);
-  border-radius: 5px;
+  inset: 8px;
+  border: 2px solid rgba(255,255,255,.48);
+  border-radius: 6px;
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,.16) 0 4px, transparent 4px 9px),
+    repeating-linear-gradient(-45deg, rgba(15,23,42,.1) 0 3px, transparent 3px 8px);
+}
+
+.card-back-mark {
+  position: relative;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(15,23,42,.3);
+  color: rgba(255,255,255,.88);
+  font-size: 11px;
+  letter-spacing: .08em;
+}
+
+.card-corner {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  width: 20px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.card-corner.top {
+  top: 5px;
+  left: 4px;
+}
+
+.card-corner.bottom {
+  right: 4px;
+  bottom: 5px;
+  transform: rotate(180deg);
+}
+
+.card-rank {
+  font-size: clamp(10px, 2.3vw, 14px);
+  font-weight: 900;
+}
+
+.card-suit {
+  font-size: clamp(10px, 2.2vw, 13px);
+  font-weight: 900;
+}
+
+.card-pips {
+  position: absolute;
+  inset: 18px 12px;
+  pointer-events: none;
+}
+
+.pip {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+}
+
+.pip.top { top: 8%; left: 50%; }
+.pip.upper { top: 26%; }
+.pip.middle { top: 50%; left: 50%; }
+.pip.lower { top: 74%; }
+.pip.bottom { top: 92%; left: 50%; transform: translate(-50%, -50%) rotate(180deg); }
+.pip.left { left: 28%; }
+.pip.right { left: 72%; }
+.pip.center { left: 50%; }
+.pip.bottom.left,
+.pip.bottom.right,
+.pip.lower.left,
+.pip.lower.right,
+.pip.lower.center {
+  transform: translate(-50%, -50%) rotate(180deg);
+}
+
+.card-pip {
+  font-size: clamp(14px, 3.5vw, 22px);
+  line-height: 1;
+}
+
+.card-face-art {
+  width: 54%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 2px solid currentColor;
+  border-radius: 999px 999px 12px 12px;
+  background: rgba(255,255,255,.45);
+  box-shadow: inset 0 -10px 20px rgba(15,23,42,.08);
+}
+
+.face-crown {
+  font-size: clamp(18px, 5vw, 30px);
+  line-height: 1;
+}
+
+.face-rank {
+  margin-top: -6px;
+  font-size: clamp(13px, 3.4vw, 20px);
+  font-weight: 900;
 }
 
 .playing-card.is-selected {
@@ -540,6 +657,20 @@ select.dg-control {
   margin-top: -34px;
 }
 
+.card-stack .playing-card:not(:last-child) .card-pips,
+.card-stack .playing-card:not(:last-child) .card-face-art {
+  display: none;
+}
+
+.card-stack .playing-card:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,.55), transparent);
+  pointer-events: none;
+}
+
 @media (max-width: 640px) {
   .quick-canvas {
     max-height: min(62svh, 520px);
@@ -558,9 +689,35 @@ select.dg-control {
 
   .playing-card,
   .card-slot {
-    min-height: 42px;
-    padding: 6px 2px;
+    min-height: 48px;
     font-size: 11px;
+  }
+
+  .playing-card {
+    min-height: 58px;
+  }
+
+  .card-corner {
+    width: 16px;
+  }
+
+  .card-corner.top {
+    top: 4px;
+    left: 3px;
+  }
+
+  .card-corner.bottom {
+    right: 3px;
+    bottom: 4px;
+  }
+
+  .card-pips {
+    inset: 16px 9px;
+  }
+
+  .pip {
+    width: 14px;
+    height: 14px;
   }
 
   .card-stack {

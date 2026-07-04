@@ -472,6 +472,39 @@
   function cardText(c) {
     return c ? c.rank + c.suit : '';
   }
+  function cardFaceHtml(card) {
+    if (!card.up) return '<span class="card-back-mark">DG</span>';
+    const pip = `<span class="card-pip">${card.suit}</span>`;
+    const rank = `<span class="card-rank">${card.rank}</span>`;
+    const suit = `<span class="card-suit">${card.suit}</span>`;
+    const faceNames = { A: 'A', J: 'J', Q: 'Q', K: 'K' };
+    if (faceNames[card.rank]) {
+      return `
+        <span class="card-corner top">${rank}${suit}</span>
+        <span class="card-face-art face-${card.rank.toLowerCase()}">
+          <span class="face-crown">${card.suit}</span>
+          <span class="face-rank">${faceNames[card.rank]}</span>
+        </span>
+        <span class="card-corner bottom">${rank}${suit}</span>
+      `;
+    }
+    const positions = {
+      2: ['top','bottom'],
+      3: ['top','middle','bottom'],
+      4: ['top left','top right','bottom left','bottom right'],
+      5: ['top left','top right','middle','bottom left','bottom right'],
+      6: ['top left','top right','middle left','middle right','bottom left','bottom right'],
+      7: ['top left','top right','upper center','middle left','middle right','bottom left','bottom right'],
+      8: ['top left','top right','upper center','middle left','middle right','lower center','bottom left','bottom right'],
+      9: ['top left','top right','upper left','upper right','middle','lower left','lower right','bottom left','bottom right'],
+      10: ['top left','top right','upper left','upper right','middle left','middle right','lower left','lower right','bottom left','bottom right']
+    }[card.value] || ['middle'];
+    return `
+      <span class="card-corner top">${rank}${suit}</span>
+      <span class="card-pips">${positions.map(pos => `<span class="pip ${pos}">${pip}</span>`).join('')}</span>
+      <span class="card-corner bottom">${rank}${suit}</span>
+    `;
+  }
 
   function runChess() {
     clearRoot();
@@ -1013,7 +1046,8 @@
       }
     }
     function cardButton(card, onClick, extra = '') {
-      const el = button(card.up ? cardText(card) : '◆', 'playing-card ' + (card.up ? card.color : 'is-down') + ' ' + extra);
+      const el = button('', 'playing-card ' + (card.up ? card.color : 'is-down') + ' ' + extra);
+      el.innerHTML = cardFaceHtml(card);
       el.onclick = onClick;
       el.setAttribute('aria-label', card.up ? cardText(card) : 'Carta virada');
       return el;
