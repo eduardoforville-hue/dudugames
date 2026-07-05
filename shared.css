@@ -453,6 +453,49 @@ select.dg-control {
   aspect-ratio: 1;
 }
 
+@media (max-width: 640px) {
+  body[data-quick-game="labirinto"] #quick-root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 0 2px 10px;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body[data-quick-game="labirinto"] .maze-grid {
+    --maze-cell: 38px;
+    width: max-content;
+    max-width: none;
+    aspect-ratio: auto;
+    grid-auto-rows: var(--maze-cell);
+    justify-content: start;
+    touch-action: manipulation;
+  }
+
+  body[data-quick-game="labirinto"] .maze-cell {
+    width: var(--maze-cell);
+    height: var(--maze-cell);
+    min-width: var(--maze-cell);
+    min-height: var(--maze-cell);
+    font-size: 20px;
+    border-radius: 9px;
+  }
+
+  body[data-quick-game="labirinto"] #quick-root > .game-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(58px, 1fr));
+    gap: 8px;
+    width: min(100%, 320px);
+  }
+
+  body[data-quick-game="labirinto"] #quick-root > .game-actions .btn {
+    min-height: 48px;
+    padding: 0;
+    font-size: 22px;
+  }
+}
+
 .whack-grid {
   grid-template-columns: repeat(3, minmax(76px, 1fr));
   max-width: 360px;

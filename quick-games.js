@@ -233,7 +233,7 @@
     let level = 1, player, goal, walls;
     const board = document.createElement('div');
     board.className = 'quick-grid maze-grid';
-    board.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+    board.style.gridTemplateColumns = `repeat(${size}, var(--maze-cell, 1fr))`;
     root.appendChild(board);
     const controls = document.createElement('div');
     controls.className = 'game-actions';
