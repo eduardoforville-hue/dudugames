@@ -23,6 +23,52 @@
   .mine-cell { width: var(--mine-cell); height: var(--mine-cell); font-size: clamp(13px, 4vw, 16px); }
   .mine-cell.open { background: color-mix(in srgb, var(--panel-strong) 86%, var(--accent)); cursor: default; }
   .mine-cell.flag { color: var(--danger) !important; }
+  .mine-modebar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 10px 0 8px;
+  }
+  .mine-modebar .btn[aria-pressed="true"] {
+    background: linear-gradient(135deg, var(--danger), #f59e0b);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 10px 24px rgba(239,68,68,.26);
+  }
+  .mine-mode {
+    font-size: .92rem;
+    color: var(--text-muted);
+    font-weight: 800;
+  }
+  @media (max-width: 640px) {
+    .mine-board {
+      --mine-cell: clamp(38px, 10.5vw, 42px);
+      width: 100%;
+      overflow-x: auto;
+      justify-content: start;
+      overscroll-behavior-inline: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: manipulation;
+    }
+    .mine-cell {
+      flex: 0 0 auto;
+      font-size: 16px;
+      border-radius: 9px;
+    }
+    .mine-modebar {
+      align-items: stretch;
+    }
+    .mine-modebar .btn {
+      min-height: 44px;
+      flex: 1 1 160px;
+    }
+    .mine-mode {
+      flex: 1 1 100%;
+      text-align: center;
+    }
+  }
 </style>
 </head>
 <body>
@@ -34,6 +80,10 @@
     <span>Tempo: <b id="time">0</b>s</span>
     <span>Bandeiras: <b id="flags">0</b></span>
     <span>Recorde: <b id="best">—</b></span>
+  </div>
+  <div class="mine-modebar" aria-label="Modo de jogada">
+    <button class="btn" id="flagMode" type="button" aria-pressed="false">🚩 Modo bandeira</button>
+    <span class="mine-mode" id="modeText">Modo abrir</span>
   </div>
   <div id="board" class="game-board mine-board"></div>
   <div class="game-actions"><button class="btn" id="restart">🔄 Novo campo</button></div>
@@ -50,7 +100,10 @@
   const flagsEl = document.getElementById('flags');
   const bestEl = document.getElementById('best');
   const msg = document.getElementById('msg');
+  const flagModeBtn = document.getElementById('flagMode');
+  const modeText = document.getElementById('modeText');
   let cells = [], openCount = 0, flags = 0, seconds = 0, timer = null, over = false, started = false, pressTimer = null;
+  let flagMode = false;
   let best = dg.getRecord('mines');
   bestEl.textContent = best || '—';
   dg.installControls({ difficulty: true, onDifficultyChange: () => location.reload() });
@@ -58,6 +111,14 @@
   function tick() { seconds++; timeEl.textContent = seconds; }
   function startTimer() { if (!timer) timer = setInterval(tick, 1000); }
   function stopTimer() { clearInterval(timer); timer = null; }
+  function setFlagMode(active) {
+    flagMode = active;
+    flagModeBtn.setAttribute('aria-pressed', String(flagMode));
+    modeText.textContent = flagMode ? 'Modo bandeira ativo' : 'Modo abrir';
+    msg.textContent = flagMode
+      ? 'Toque nas casas para marcar ou remover bandeiras.'
+      : 'Toque para abrir. Use o modo bandeira para marcar minas.';
+  }
   function neighbors(x, y) {
     const out = [];
     for (let yy = y - 1; yy <= y + 1; yy++) for (let xx = x - 1; xx <= x + 1; xx++)
@@ -66,7 +127,8 @@
   }
   function reset() {
     stopTimer(); cells = []; openCount = 0; flags = 0; seconds = 0; over = false; started = false;
-    timeEl.textContent = '0'; flagsEl.textContent = '0'; msg.textContent = 'Clique para abrir. Clique direito ou toque longo para marcar.';
+    setFlagMode(false);
+    timeEl.textContent = '0'; flagsEl.textContent = '0'; msg.textContent = 'Toque para abrir. Use o modo bandeira para marcar minas.';
     board.innerHTML = ''; board.style.setProperty('--mine-cols', W);
     for (let y = 0; y < H; y++) {
       cells[y] = [];
@@ -77,6 +139,7 @@
         el.type = 'button';
         el.addEventListener('click', () => {
           if (cell.suppressClick) { cell.suppressClick = false; return; }
+          if (flagMode) { flag(cell); return; }
           openCell(cell);
         });
         el.addEventListener('contextmenu', e => { e.preventDefault(); flag(cell); });
@@ -119,6 +182,7 @@
     if (dg.setRecord('mines', seconds)) { best = seconds; bestEl.textContent = best; msg.textContent = `Novo recorde: ${seconds}s!`; }
     else msg.textContent = `Campo limpo em ${seconds}s.`;
   }
+  flagModeBtn.addEventListener('click', () => setFlagMode(!flagMode));
   document.getElementById('restart').addEventListener('click', reset);
   window.addEventListener('dudu-reset', () => { best = 0; bestEl.textContent = '—'; });
   reset();
